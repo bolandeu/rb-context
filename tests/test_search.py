@@ -7,10 +7,10 @@ from types import SimpleNamespace
 import httpx
 import pytest
 import requests
-from tavily.errors import InvalidAPIKeyError, UsageLimitExceededError
+from tavily.errors import ForbiddenError, InvalidAPIKeyError, UsageLimitExceededError
 
 from rb_context.core import services
-from rb_context.core.errors import AuthRequired, InvalidArguments, ProviderError
+from rb_context.core.errors import AuthRequired, InvalidArguments, ProviderError, QuotaExceeded
 from rb_context.core.models import SearchHit
 from rb_context.providers import BraveProvider, ExaProvider, SearchProvider, TavilyProvider
 
@@ -59,6 +59,7 @@ def test_exa_maps_highlights_to_snippet_and_passes_mode() -> None:
         (ValueError("Request failed with status code 401: bad key"), AuthRequired, None),
         (ValueError("Request failed with status code 500: boom"), ProviderError, 500),
         (ValueError("something odd"), ProviderError, None),
+        (ValueError('Request failed with status code 402: {"tag":"NO_MORE_CREDITS"}'), QuotaExceeded, 402),
         (requests.ConnectionError("down"), ProviderError, None),
     ],
 )
@@ -302,3 +303,64 @@ def test_search_command_bad_mode_is_invalid_arguments(tmp_path: Path, fake_provi
     code, payload = invoke_json("--project", str(tmp_path), "search", "q", "-p", "tavily", "--tavily-mode", "deep")
     assert code == 2
     assert payload["error"]["code"] == "INVALID_ARGUMENTS"
+
+
+# --- исчерпан баланс / лимит тарифа -----------------------------------------
+
+
+def test_exa_402_names_the_quota_tag() -> None:
+    error = ValueError('Request failed with status code 402: {"tag":"TEAM_BUDGET_EXCEEDED"}')
+    with pytest.raises(QuotaExceeded) as exc_info:
+        ExaProvider(_FakeExa(error=error)).search("q", limit=1)  # ty: ignore[invalid-argument-type]
+    assert exc_info.value.code == "QUOTA_EXCEEDED"
+    assert "TEAM_BUDGET_EXCEEDED" in exc_info.value.message
+    assert "повтор не поможет" in (exc_info.value.action or "")
+
+
+@pytest.mark.parametrize(("status", "expected"), [(432, QuotaExceeded), (433, QuotaExceeded), (403, AuthRequired)])
+def test_tavily_forbidden_is_quota_only_for_432_433(status: int, expected: type[Exception]) -> None:
+    provider = TavilyProvider(_FakeExa(error=ForbiddenError("limit")))  # ty: ignore[invalid-argument-type]
+    response = requests.Response()
+    response.status_code = status
+    provider._remember_status(response)  # так его вызывает хук requests-сессии SDK
+    with pytest.raises(expected):
+        provider.search("q", limit=1)
+
+
+def test_tavily_real_client_gets_status_hook(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("rb_context.credentials.manager.get_secret", lambda provider, field="api_key": "k")
+    provider = TavilyProvider()
+    session = provider._client.session
+    assert provider._remember_status in session.hooks["response"]
+    assert session.headers["Authorization"] == "Bearer k"
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "expected"),
+    [
+        (429, {"error": {"code": "QUOTA_LIMITED"}}, QuotaExceeded),
+        (402, {}, QuotaExceeded),
+        (429, {"error": {"code": "RATE_LIMITED"}}, ProviderError),
+    ],
+)
+def test_brave_quota_vs_rate_limit(status: int, body: dict, expected: type[Exception]) -> None:
+    with pytest.raises(expected) as exc_info:
+        _brave(lambda request: httpx.Response(status, json=body)).search("q", limit=1)
+    assert (getattr(exc_info.value, "code", None) == "QUOTA_EXCEEDED") is (expected is QuotaExceeded)
+
+
+def test_all_failed_envelope_lists_each_provider_error(tmp_path: Path, fake_providers: dict) -> None:
+    fake_providers["exa"] = QuotaExceeded("exa", "HTTP 402 NO_MORE_CREDITS", status=402)
+    fake_providers["tavily"] = QuotaExceeded("tavily", "HTTP 432", status=432)
+    code, payload = invoke_json("--project", str(tmp_path), "search", "q", "-p", "exa,tavily")
+    assert code == 5
+    assert [e["code"] for e in payload["error"]["errors"]] == ["QUOTA_EXCEEDED", "QUOTA_EXCEEDED"]
+    assert {e["provider"] for e in payload["error"]["errors"]} == {"exa", "tavily"}
+
+
+def test_partial_quota_is_visible_in_sources(tmp_path: Path, fake_providers: dict) -> None:
+    fake_providers["exa"] = QuotaExceeded("exa", "HTTP 402", status=402)
+    code, payload = invoke_json("--project", str(tmp_path), "search", "q", "-p", "exa,brave")
+    assert code == 0
+    [failed] = [src for src in payload["sources"] if not src["ok"]]
+    assert failed["error"]["code"] == "QUOTA_EXCEEDED"

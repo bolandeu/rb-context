@@ -17,3 +17,6 @@ write them at release time.
 - Режимы поиска `--exa-mode` и `--tavily-mode`.
 - `providers` в конфиге проекта — кого опрашивать без `--provider`.
 - `auth login|logout|status --provider exa|tavily|brave`, `doctor` проверяет ключ каждого.
+- Ошибка `QUOTA_EXCEEDED` (exit 5), когда у провайдера кончился баланс или лимит тарифа
+  (Exa 402, Tavily 432/433, Brave 402 / 429 `QUOTA_LIMITED`); видна в `sources[].error`,
+  а при отказе всех — в `error.errors` по каждому провайдеру.

@@ -90,6 +90,31 @@ class ProviderError(CliError):
         return payload
 
 
+class QuotaExceeded(ProviderError):
+    """Кончился баланс или лимит тарифа провайдера: повтор не поможет, нужен человек."""
+
+    def __init__(self, provider: str, detail: str, *, status: int | None = None) -> None:
+        super().__init__(
+            provider,
+            f"закончился баланс или лимит тарифа ({detail})",
+            status=status,
+            action=f"Пополнить баланс или поднять лимит в кабинете {provider}; повтор не поможет.",
+        )
+        self.code = "QUOTA_EXCEEDED"
+
+
+class AllProvidersFailed(ProviderError):
+    """Не ответил ни один провайдер; `errors` — ошибка каждого, как в `sources[].error`."""
+
+    def __init__(self, errors: list[CliError]) -> None:
+        summary = "; ".join(dict.fromkeys(e.message for e in errors))
+        super().__init__("all", f"не ответил ни один провайдер — {summary}"[:1000])
+        self.errors = [e.to_dict() for e in errors]
+
+    def to_dict(self) -> dict:
+        return {**super().to_dict(), "errors": self.errors}
+
+
 class CliTooOld(CliError):
     def __init__(self, installed: str, required: str) -> None:
         super().__init__(

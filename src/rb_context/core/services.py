@@ -9,7 +9,7 @@ import tomli_w
 from packaging.version import Version
 
 from ..providers import SearchProvider, provider_class
-from .errors import CliError, CliTooOld, InvalidArguments, ProjectNotInitialized, ProviderError
+from .errors import AllProvidersFailed, CliError, CliTooOld, InvalidArguments, ProjectNotInitialized
 from .models import DEFAULT_PROVIDERS, ProjectConfig, ProviderRun, SearchHit
 from .version import CLI_NAME, installed_version
 
@@ -114,7 +114,7 @@ def search(
 
     Упавший провайдер не мешает остальным: его ошибка попадает в
     `ProviderRun.error`. Ошибка поднимается, только если не ответил никто —
-    одна как есть, несколько — сводный `ProviderError`.
+    одна как есть, несколько — `AllProvidersFailed` со списком `errors`.
     `factory` — тестовый шов вместо реальных провайдеров.
     """
     modes = modes or {}
@@ -142,6 +142,5 @@ def search(
     if runs and len(errors) == len(runs):
         if len({(e.code, e.message) for e in errors}) == 1:
             raise errors[0]
-        summary = "; ".join(dict.fromkeys(e.message for e in errors))
-        raise ProviderError("all", f"не ответил ни один провайдер — {summary}"[:1000])
+        raise AllProvidersFailed(errors)
     return hits, runs

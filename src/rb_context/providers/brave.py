@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import re
 
+from ..core.errors import ProviderError, QuotaExceeded
 from ..core.models import SearchHit, extract_domain
 from .base import SearchProvider
 from .http import HttpProvider
@@ -31,7 +32,13 @@ class BraveProvider(HttpProvider, SearchProvider):
         return {"X-Subscription-Token": self._api_key, "Accept": "application/json"}
 
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
-        data = self.get_json("/web/search", q=query, count=min(limit, MAX_COUNT), extra_snippets="true")
+        try:
+            data = self.get_json("/web/search", q=query, count=min(limit, MAX_COUNT), extra_snippets="true")
+        except ProviderError as exc:
+            # Исчерпан месячный лимит: 429 с кодом QUOTA_LIMITED в теле (просто частота — RATE_LIMITED) или 402.
+            if exc.status == 402 or "QUOTA_LIMITED" in exc.message:
+                raise QuotaExceeded(self.name, f"HTTP {exc.status} QUOTA_LIMITED", status=exc.status) from exc
+            raise
         results = (data.get("web") or {}).get("results") or []
         return [
             SearchHit(
