@@ -68,4 +68,4 @@ def test_doctor_reports_credential_checks(tmp_path: Path, fake_keyring) -> None:
     _, payload = invoke_json("--project", str(tmp_path), "doctor")
     names = [check["name"] for check in payload["checks"]]
     assert "credential_store" in names
-    assert {"credential:exa", "credential:tavily", "credential:brave"} <= set(names)
+    assert "credential:exa" in names  # провайдер по умолчанию

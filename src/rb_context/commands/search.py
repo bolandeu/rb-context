@@ -7,7 +7,7 @@ import typer
 from .. import output
 from ..core import services
 from ..core.models import ProviderRun, SearchHit
-from ..providers import ExaProvider, TavilyProvider, providers_help
+from ..providers import ExaProvider, SerpProvider, TavilyProvider, providers_help
 
 
 def _render(hits: list[SearchHit], runs: list[ProviderRun]) -> None:
@@ -17,7 +17,8 @@ def _render(hits: list[SearchHit], runs: list[ProviderRun]) -> None:
             output.human.err_console.print(f"[yellow]{run.provider} ('{run.query}'): {run.error['message']}[/yellow]")
     for hit in hits:
         # typer.echo, не rich: rich переносит строки по ширине терминала и ломает URL и код.
-        typer.echo(f"## {hit.title or hit.url}\n{hit.url} · {hit.provider} #{hit.position}\n\n{hit.snippet}\n")
+        source = f"{hit.provider}/{hit.engine}" if hit.engine else hit.provider
+        typer.echo(f"## {hit.title or hit.url}\n{hit.url} · {source} #{hit.position}\n\n{hit.snippet}\n")
 
 
 @output.guard
@@ -28,8 +29,9 @@ def search(
         None,
         "--provider",
         "-p",
-        help=f"Кого опросить, через запятую; опрашиваются все сразу. Доступны: {providers_help()}. "
-        "По умолчанию — `providers` из конфига проекта, иначе все.",
+        help="Кого опросить: один (-p exa), несколько через запятую (-p exa,serp) или все (-p all); "
+        "выбранные опрашиваются параллельно, и каждый тратит свой лимит. "
+        f"Доступны: {providers_help()}. По умолчанию — `providers` из конфига проекта, иначе exa.",
     ),
     limit: int = typer.Option(
         10, "--limit", "-n", min=1, max=100, help="Результатов с каждого провайдера (brave ≤ 20)."
@@ -40,34 +42,45 @@ def search(
     tavily_mode: str | None = typer.Option(
         None, "--tavily-mode", help=f"Режим Tavily: {', '.join(TavilyProvider.modes)}. По умолчанию basic."
     ),
+    serp_engine: str | None = typer.Option(
+        None, "--serp-engine", help=f"Поисковик для serp: {', '.join(SerpProvider.modes)}. По умолчанию yandex."
+    ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
     verbose: bool = output.VerboseOption,
 ) -> None:
-    """Веб-поиск для контекста LLM: опрашивает всех выбранных провайдеров параллельно.
+    """Веб-поиск для контекста LLM: опрашивает выбранных провайдеров параллельно.
+
+    Без -p — только провайдер по умолчанию (exa или `providers` проекта):
+    каждый опрошенный тратит свой лимит, поэтому всех сразу — только явно, -p all.
 
     Результаты не смешиваются и не дедуплицируются: у каждого своя позиция
-    и пометка provider. Упавший провайдер не мешает остальным — его ошибка
-    в `sources[].error` (человеку — предупреждение в stderr). Не ответил
-    никто — PROVIDER_ERROR (exit 5) или AUTH_REQUIRED (exit 3).
+    и пометка provider (у serp ещё engine — yandex/google). Упавший
+    провайдер не мешает остальным — его ошибка в `sources[].error` (человеку —
+    предупреждение в stderr). Не ответил никто — exit 5 (PROVIDER_ERROR,
+    QUOTA_EXCEEDED) или 3 (AUTH_REQUIRED).
 
     snippet — текст-контекст провайдера: exa — хайлайты страницы, tavily —
-    выжимка content, brave — описание и доп. сниппеты.
+    выжимка content, brave — описание и доп. сниппеты, serp — сниппет из
+    выдачи Яндекса/Google (нужен установленный CLI serp со своими ключами).
 
-    --json: {"ok": true, "count": N, "results": [{provider, query, position,
-    url, domain, title, snippet, published, score}, ...], "sources":
+    --json: {"ok": true, "count": N, "results": [{provider, engine, query,
+    position, url, domain, title, snippet, published, score}, ...], "sources":
     [{provider, query, ok, count, error}, ...]}. Без --json — markdown в stdout.
 
     \b
     Примеры:
-      context search "rag chunking strategies"
-      context search "запрос" -p exa,tavily -n 5
+      context search "rag chunking strategies"            # только exa
+      context search "запрос" -p tavily                   # только tavily
+      context search "запрос" -p exa,serp -n 5            # два провайдера
+      context search "запрос" -p all                      # все
+      context search "купить диван" -p serp --serp-engine both
       context search "сравнение векторных БД" -p exa --exa-mode deep
-      context search "news about uv" -p tavily --tavily-mode advanced --json
     """
     providers = services.resolve_providers(provider, Path(ctx.obj.get("project") or Path.cwd()))
     output.vecho(ctx, f"Провайдеры: {', '.join(providers)}")
-    modes = {name: mode for name, mode in (("exa", exa_mode), ("tavily", tavily_mode)) if name in providers}
+    requested = {"exa": exa_mode, "tavily": tavily_mode, "serp": serp_engine}
+    modes = {name: mode for name, mode in requested.items() if name in providers}
     hits, runs = services.search(queries, providers=providers, limit=limit, modes=modes)
     output.emit_success(
         ctx,

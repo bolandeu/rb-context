@@ -12,6 +12,11 @@ app = output.group("Ключи провайдеров (связка ключей
 ProviderOption = typer.Option(..., "--provider", "-p", help=f"Провайдер. Доступны: {providers_help()}.")
 
 
+def _require_api_key_provider(provider: str) -> None:
+    if not provider_class(provider).needs_api_key:
+        raise InvalidArguments(f"Ключи {provider} хранит сам {provider}: '{provider} auth login'.")
+
+
 @app.command("login")
 @output.guard
 def login(
@@ -27,7 +32,7 @@ def login(
     если переменная задана, иначе спрашивается. С --non-interactive и без
     переменной — ошибка, а не вопрос.
     """
-    provider_class(provider)
+    _require_api_key_provider(provider)
     secret = credentials.read_secret_from_env(provider)
     if secret is None:
         if ctx.obj.get("non_interactive") or non_interactive:
@@ -52,7 +57,7 @@ def logout(
     quiet: bool = output.QuietOption,
 ) -> None:
     """Удалить API-ключ провайдера из связки ключей ОС."""
-    provider_class(provider)
+    _require_api_key_provider(provider)
     credentials.delete_secret(provider)
     output.emit_success(
         ctx,
@@ -70,7 +75,7 @@ def auth_status(
     quiet: bool = output.QuietOption,
 ) -> None:
     """Проверить, есть ли ключ провайдера (в env или связке ключей)."""
-    authenticated = provider_class(provider).load_api_key() is not None
+    authenticated, _ = provider_class(provider).check()
     output.emit_success(
         ctx,
         {"provider": provider, "authenticated": authenticated},

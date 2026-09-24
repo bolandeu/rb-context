@@ -15,6 +15,8 @@ class SearchHit(BaseModel):
     provider: str
     query: str
     position: int
+    # Поисковик, из выдачи которого результат (только у serp: yandex / google).
+    engine: str | None = None
     url: str
     domain: str
     title: str
@@ -38,7 +40,8 @@ def extract_domain(url: str) -> str:
     return urllib.parse.urlparse(url).netloc.removeprefix("www.")
 
 
-DEFAULT_PROVIDERS = ["exa", "tavily", "brave"]
+# Без --provider и без проекта — один провайдер: каждый запрос тратит лимит у каждого опрошенного.
+DEFAULT_PROVIDERS = ["exa"]
 
 
 class CliCompat(BaseModel):
@@ -48,7 +51,7 @@ class CliCompat(BaseModel):
 class ProjectConfig(BaseModel):
     version: int = 1
     name: str
-    # Провайдеры, которых `search` опрашивает без --provider: все сразу.
+    # Кого `search` опрашивает без --provider (`all` — всех).
     providers: list[str] = Field(default_factory=lambda: list(DEFAULT_PROVIDERS))
     cli: CliCompat = Field(default_factory=CliCompat)
 

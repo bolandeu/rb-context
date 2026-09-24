@@ -78,7 +78,7 @@ def test_init_force_resets_config(tmp_path: Path) -> None:
     assert payload["already_initialized"] is False
 
     _, payload = invoke_json("--project", str(tmp_path), "config", "get", "providers")
-    assert payload["value"] == ["exa", "tavily", "brave"]
+    assert payload["value"] == ["exa"]
 
 
 def test_status_without_init_fails(tmp_path: Path) -> None:

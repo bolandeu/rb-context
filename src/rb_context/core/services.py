@@ -8,7 +8,7 @@ from pathlib import Path
 import tomli_w
 from packaging.version import Version
 
-from ..providers import SearchProvider, provider_class
+from ..providers import PROVIDERS, SearchProvider, provider_class
 from .errors import AllProvidersFailed, CliError, CliTooOld, InvalidArguments, ProjectNotInitialized
 from .models import DEFAULT_PROVIDERS, ProjectConfig, ProviderRun, SearchHit
 from .version import CLI_NAME, installed_version
@@ -79,12 +79,14 @@ def init_project(project_root: Path, name: str) -> ProjectConfig:
 
 
 def resolve_providers(explicit: str | None, start: Path) -> list[str]:
-    """Кого опрашивать: --provider "a,b" → `providers` проекта → все провайдеры."""
+    """Кого опрашивать: --provider "a,b" → `providers` проекта → `DEFAULT_PROVIDERS`; `all` — всех."""
     if explicit:
         names = [name.strip() for name in explicit.split(",") if name.strip()]
     else:
         root = find_project_root(start)
         names = load_config(root).providers if root is not None else list(DEFAULT_PROVIDERS)
+    if "all" in names:
+        return list(PROVIDERS)
     for name in names:
         provider_class(name)  # неизвестное имя → INVALID_ARGUMENTS до любых запросов
     return list(dict.fromkeys(names))

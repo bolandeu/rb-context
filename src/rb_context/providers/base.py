@@ -5,6 +5,7 @@ from typing import ClassVar
 
 from ..core.errors import AuthRequired
 from ..core.models import SearchHit
+from ..core.version import CLI_NAME
 from ..credentials import manager as credentials
 
 
@@ -21,6 +22,15 @@ class SearchProvider(ABC):
     summary: ClassVar[str] = ""
     # Режимы поиска сервиса (`--<name>-mode`); пусто — режимов нет.
     modes: ClassVar[tuple[str, ...]] = ()
+    # False — ключи хранит не context (serp держит их сам), `auth login` к нему не относится.
+    needs_api_key: ClassVar[bool] = True
+
+    @classmethod
+    def check(cls) -> tuple[bool, str | None]:
+        """Готов ли провайдер к работе и что сделать, если нет — для doctor и auth status."""
+        if cls.load_api_key():
+            return True, None
+        return False, f"run '{CLI_NAME} auth login --provider {cls.name}'"
 
     @classmethod
     def load_api_key(cls) -> str | None:

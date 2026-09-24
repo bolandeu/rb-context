@@ -20,3 +20,10 @@ write them at release time.
 - Ошибка `QUOTA_EXCEEDED` (exit 5), когда у провайдера кончился баланс или лимит тарифа
   (Exa 402, Tavily 432/433, Brave 402 / 429 `QUOTA_LIMITED`); видна в `sources[].error`,
   а при отказе всех — в `error.errors` по каждому провайдеру.
+- Провайдер `serp`: выдача Яндекса/Google со сниппетами через установленный CLI `serp`
+  (`serp snippets --json`, без зависимости от `rb-serp`), `--serp-engine yandex|google|both`.
+
+### Changed
+
+- Без `--provider` опрашивается один провайдер (`exa`), а не все — чтобы не тратить лимиты;
+  все сразу — `-p all` (в том числе в `providers` конфига проекта).

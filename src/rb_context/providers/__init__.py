@@ -4,7 +4,8 @@
 `PROVIDERS`. Дальше он доступен по имени в `context search --provider`,
 `context auth login --provider` и в `providers` конфига проекта. Сервис с
 официальным SDK оборачивается им (exa, tavily), без SDK — `HttpProvider`
-(brave); в обоих случаях наружу только `ProviderError` / `AuthRequired`.
+(brave), CLI — subprocess с его `--json` (serp); во всех случаях наружу
+только `ProviderError` / `AuthRequired`.
 """
 
 from __future__ import annotations
@@ -14,12 +15,14 @@ from .base import SearchProvider
 from .brave import BraveProvider
 from .exa import ExaProvider
 from .http import HttpProvider
+from .serp import SerpProvider
 from .tavily import TavilyProvider
 
 PROVIDERS: dict[str, type[SearchProvider]] = {
     ExaProvider.name: ExaProvider,
     TavilyProvider.name: TavilyProvider,
     BraveProvider.name: BraveProvider,
+    SerpProvider.name: SerpProvider,
 }
 
 
@@ -41,6 +44,7 @@ __all__ = [
     "ExaProvider",
     "HttpProvider",
     "SearchProvider",
+    "SerpProvider",
     "TavilyProvider",
     "provider_class",
     "providers_help",

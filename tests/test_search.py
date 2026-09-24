@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,7 +14,8 @@ from tavily.errors import ForbiddenError, InvalidAPIKeyError, UsageLimitExceeded
 from rb_context.core import services
 from rb_context.core.errors import AuthRequired, InvalidArguments, ProviderError, QuotaExceeded
 from rb_context.core.models import SearchHit
-from rb_context.providers import BraveProvider, ExaProvider, SearchProvider, TavilyProvider
+from rb_context.providers import BraveProvider, ExaProvider, SearchProvider, SerpProvider, TavilyProvider
+from rb_context.providers import serp as serp_module
 
 from .test_cli import init, invoke, invoke_json
 
@@ -247,8 +250,12 @@ def test_resolve_providers_explicit_dedupes_and_validates(tmp_path: Path) -> Non
         services.resolve_providers("exa,google", tmp_path)
 
 
+def test_resolve_providers_all_means_every_provider(tmp_path: Path) -> None:
+    assert services.resolve_providers("all", tmp_path) == ["exa", "tavily", "brave", "serp"]
+
+
 def test_resolve_providers_uses_project_config_then_default(tmp_path: Path) -> None:
-    assert services.resolve_providers(None, tmp_path) == ["exa", "tavily", "brave"]
+    assert services.resolve_providers(None, tmp_path) == ["exa"]
     init(tmp_path)
     invoke("--project", str(tmp_path), "config", "set", "providers", "tavily")
     assert services.resolve_providers(None, tmp_path) == ["tavily"]
@@ -364,3 +371,108 @@ def test_partial_quota_is_visible_in_sources(tmp_path: Path, fake_providers: dic
     assert code == 0
     [failed] = [src for src in payload["sources"] if not src["ok"]]
     assert failed["error"]["code"] == "QUOTA_EXCEEDED"
+
+
+# --- serp (через установленный CLI) -----------------------------------------
+
+
+@pytest.fixture
+def fake_serp(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Подменить `serp ... --json`: `state["payload"]` — что он напечатает, `state["argv"]` — с чем вызван."""
+    state: dict = {"payload": {"ok": True, "results": []}, "stdout": None, "argv": None}
+    monkeypatch.setattr(serp_module.shutil, "which", lambda name: "/bin/serp")
+
+    def fake_run(argv, **kwargs):
+        state["argv"] = argv
+        stdout = state["stdout"] if state["stdout"] is not None else json.dumps(state["payload"])
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="boom")
+
+    monkeypatch.setattr(serp_module.subprocess, "run", fake_run)
+    return state
+
+
+def _row(engine: str, position: int) -> dict:
+    return {
+        "serp_position": position,
+        "searchengine": engine,
+        "url": f"https://{engine}.ru/{position}",
+        "domain": f"{engine}.ru",
+        "title": "T",
+        "snippet": "S",
+        "pubdate": "",
+    }
+
+
+def test_serp_rounds_top_to_pages_and_cuts_per_engine(fake_serp: dict) -> None:
+    fake_serp["payload"] = {"ok": True, "results": [_row(e, p) for e in ("yandex", "google") for p in (1, 2, 3)]}
+    hits = SerpProvider().search("q", limit=2, mode="both")
+    assert fake_serp["argv"] == ["/bin/serp", "snippets", "q", "--engine", "both", "--top", "10", "--json"]
+    assert [(h.engine, h.position) for h in hits] == [("yandex", 1), ("yandex", 2), ("google", 1), ("google", 2)]
+    assert hits[0].provider == "serp"
+    assert hits[0].published is None
+
+
+def test_serp_default_engine_is_yandex(fake_serp: dict) -> None:
+    SerpProvider().search("q", limit=15)
+    assert fake_serp["argv"][3:7] == ["--engine", "yandex", "--top", "20"]
+
+
+def test_serp_auth_error_keeps_serp_action(fake_serp: dict) -> None:
+    fake_serp["payload"] = {
+        "ok": False,
+        "error": {"code": "AUTH_REQUIRED", "message": "m", "action": "Run 'serp auth login --provider xmlriver'."},
+    }
+    with pytest.raises(AuthRequired) as exc_info:
+        SerpProvider().search("q", limit=1)
+    assert exc_info.value.action == "Run 'serp auth login --provider xmlriver'."
+
+
+def test_serp_other_error_is_provider_error(fake_serp: dict) -> None:
+    fake_serp["payload"] = {"ok": False, "error": {"code": "PROVIDER_ERROR", "message": "xmlriver down"}}
+    with pytest.raises(ProviderError, match="xmlriver down"):
+        SerpProvider().search("q", limit=1)
+
+
+def test_serp_non_json_output_is_provider_error(fake_serp: dict) -> None:
+    fake_serp["stdout"] = "Traceback"
+    with pytest.raises(ProviderError, match="boom"):
+        SerpProvider().search("q", limit=1)
+
+
+def test_serp_timeout_is_provider_error(fake_serp: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    def slow(argv, **kwargs):
+        raise subprocess.TimeoutExpired(argv, 1)
+
+    monkeypatch.setattr(serp_module.subprocess, "run", slow)
+    with pytest.raises(ProviderError, match="нет ответа"):
+        SerpProvider().search("q", limit=1)
+
+
+def test_serp_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(serp_module.shutil, "which", lambda name: None)
+    with pytest.raises(ProviderError) as exc_info:
+        SerpProvider().search("q", limit=1)
+    assert "uv tool install" in (exc_info.value.action or "")
+    ok, detail = SerpProvider.check()
+    assert not ok
+    assert "uv tool install" in (detail or "")
+
+
+@pytest.mark.parametrize(("authenticated", "ok"), [(True, True), (False, False)])
+def test_serp_check_asks_serp_itself(fake_serp: dict, authenticated: bool, ok: bool) -> None:
+    fake_serp["payload"] = {"ok": True, "authenticated": authenticated}
+    assert SerpProvider.check()[0] is ok
+    assert fake_serp["argv"] == ["/bin/serp", "auth", "status", "--json"]
+
+
+def test_auth_login_for_serp_points_to_serp(fake_serp: dict) -> None:
+    code, payload = invoke_json("auth", "login", "-p", "serp", "--non-interactive")
+    assert code == 2
+    assert "serp auth login" in payload["error"]["message"]
+
+
+def test_human_output_shows_serp_engine(tmp_path: Path, fake_serp: dict) -> None:
+    fake_serp["payload"] = {"ok": True, "results": [_row("google", 1)]}
+    result = invoke("--project", str(tmp_path), "search", "q", "-p", "serp", "--serp-engine", "google")
+    assert result.exit_code == 0
+    assert "https://google.ru/1 · serp/google #1" in result.stdout

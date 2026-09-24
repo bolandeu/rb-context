@@ -8,7 +8,7 @@ from .. import output
 from ..core import services
 from ..core.errors import CliTooOld, InvalidArguments
 from ..core.models import DEFAULT_PROVIDERS, ProjectConfig
-from ..core.version import CLI_NAME, DEV_VERSION, installed_version
+from ..core.version import DEV_VERSION, installed_version
 from ..credentials import manager as credentials
 from ..providers import provider_class
 
@@ -24,17 +24,10 @@ def _auth_checks(providers: list[str]) -> list[dict]:
     ]
     for provider in providers:
         try:
-            available = provider_class(provider).load_api_key() is not None
+            ok, detail = provider_class(provider).check()
         except InvalidArguments as exc:
-            checks.append({"name": f"credential:{provider}", "ok": False, "detail": exc.message})
-            continue
-        checks.append(
-            {
-                "name": f"credential:{provider}",
-                "ok": available,
-                "detail": None if available else f"run '{CLI_NAME} auth login --provider {provider}'",
-            }
-        )
+            ok, detail = False, exc.message
+        checks.append({"name": f"credential:{provider}", "ok": ok, "detail": detail})
     return checks
 
 
