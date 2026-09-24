@@ -81,7 +81,6 @@ context search "news about uv" --json                     # для агенто�
 Цена — serp должен быть установлен отдельно:
 `uv tool install "git+https://github.com/bolandeu/serp.git"`; без него провайдер `serp`
 отвечает `PROVIDER_ERROR` с этой командой в `action`, остальные работают.
-Сниппеты при этом пишутся в журнал serp, и `serp ... --cache` потом отдаст их бесплатно.
 
 Отвергнуто: LangChain / LlamaIndex tools для этих сервисов — тяжёлая зависимость
 ради трёх вызовов, и ошибки всё равно пришлось бы переводить в коды CLI. Исключения
