@@ -95,9 +95,13 @@ def resolve_providers(explicit: str | None, start: Path) -> list[str]:
 def check_modes(modes: dict[str, str | None]) -> None:
     """Режим поиска должен быть из `modes` своего провайдера."""
     for name, mode in modes.items():
-        allowed = provider_class(name).modes
-        if mode is not None and mode not in allowed:
-            raise InvalidArguments(f"Режим '{mode}' не поддерживается {name}. Доступны: {', '.join(allowed)}.")
+        if mode is None:
+            continue
+        cls = provider_class(name)
+        parts = [part.strip() for part in mode.split(",")] if cls.multi_mode else [mode]
+        for part in parts:
+            if part not in cls.modes:
+                raise InvalidArguments(f"Режим '{part}' не поддерживается {name}. Доступны: {', '.join(cls.modes)}.")
 
 
 def _default_factory(name: str) -> SearchProvider:

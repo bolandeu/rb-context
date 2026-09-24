@@ -412,9 +412,23 @@ def test_serp_rounds_top_to_pages_and_cuts_to_limit(fake_serp: dict) -> None:
     assert hits[0].published is None
 
 
-def test_serp_engine_is_yandex_or_google_only() -> None:
+def test_serp_both_engines_in_one_call_with_limit_per_engine(fake_serp: dict) -> None:
+    fake_serp["payload"] = {"ok": True, "results": [_row(e, p) for e in ("yandex", "google") for p in (1, 2, 3)]}
+    hits = SerpProvider().search("q", limit=2, mode="yandex, google")
+    assert fake_serp["argv"][3:5] == ["--engine", "both"]
+    assert [(h.engine, h.position) for h in hits] == [("yandex", 1), ("yandex", 2), ("google", 1), ("google", 2)]
+
+
+@pytest.mark.parametrize("mode", ["both", "yandex,bing"])
+def test_serp_engine_is_yandex_google_or_both_listed(mode: str) -> None:
     with pytest.raises(InvalidArguments):
-        services.check_modes({"serp": "both"})
+        services.check_modes({"serp": mode})
+
+
+def test_multi_mode_only_where_allowed() -> None:
+    services.check_modes({"serp": "yandex,google"})
+    with pytest.raises(InvalidArguments):
+        services.check_modes({"exa": "fast,deep"})
 
 
 def test_serp_default_engine_is_yandex(fake_serp: dict) -> None:

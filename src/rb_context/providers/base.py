@@ -22,6 +22,8 @@ class SearchProvider(ABC):
     summary: ClassVar[str] = ""
     # Режимы поиска сервиса (`--<name>-mode`); пусто — режимов нет.
     modes: ClassVar[tuple[str, ...]] = ()
+    # True — можно несколько режимов через запятую (serp: yandex,google).
+    multi_mode: ClassVar[bool] = False
     # False — ключи хранит не context (serp держит их сам), `auth login` к нему не относится.
     needs_api_key: ClassVar[bool] = True
 

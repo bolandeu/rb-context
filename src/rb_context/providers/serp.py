@@ -43,6 +43,7 @@ class SerpProvider(SearchProvider):
     name = "serp"
     summary = "Яндекс/Google — выдача и сниппеты через CLI serp"
     modes = ("yandex", "google")  # первый — по умолчанию
+    multi_mode = True
     needs_api_key = False
 
     @classmethod
@@ -57,7 +58,9 @@ class SerpProvider(SearchProvider):
 
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
         top = min(100, max(10, -(-limit // 10) * 10))  # serp берёт выдачу страницами по 10
-        payload = _run_json(["snippets", query, "--engine", mode or self.modes[0], "--top", str(top)])
+        engines = {part.strip() for part in (mode or self.modes[0]).split(",")}
+        engine = "both" if len(engines) > 1 else engines.pop()  # оба поисковика serp просит одним вызовом
+        payload = _run_json(["snippets", query, "--engine", engine, "--top", str(top)])
         if not payload.get("ok"):
             error = payload.get("error") or {}
             if error.get("code") == "AUTH_REQUIRED":
@@ -77,5 +80,6 @@ class SerpProvider(SearchProvider):
                 snippet=row.get("snippet") or "",
                 published=row.get("pubdate") or None,
             )
-            for row in payload.get("results", [])[:limit]
+            for row in payload.get("results", [])
+            if row["serp_position"] <= limit  # позиции у каждого поисковика свои, с 1
         ]

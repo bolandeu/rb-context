@@ -43,7 +43,9 @@ def search(
         None, "--tavily-mode", help=f"Режим Tavily: {', '.join(TavilyProvider.modes)}. По умолчанию basic."
     ),
     serp_engine: str | None = typer.Option(
-        None, "--serp-engine", help=f"Поисковик для serp: {', '.join(SerpProvider.modes)}. По умолчанию yandex."
+        None,
+        "--serp-engine",
+        help=f"Поисковик для serp: {', '.join(SerpProvider.modes)} или оба через запятую. По умолчанию yandex.",
     ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
@@ -75,6 +77,7 @@ def search(
       context search "запрос" -p exa,serp -n 5            # два провайдера
       context search "запрос" -p all                      # все
       context search "купить диван" -p serp --serp-engine google
+      context search "купить диван" -p serp --serp-engine yandex,google
       context search "сравнение векторных БД" -p exa --exa-mode deep
     """
     providers = services.resolve_providers(provider, Path(ctx.obj.get("project") or Path.cwd()))
