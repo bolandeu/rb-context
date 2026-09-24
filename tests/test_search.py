@@ -403,13 +403,18 @@ def _row(engine: str, position: int) -> dict:
     }
 
 
-def test_serp_rounds_top_to_pages_and_cuts_per_engine(fake_serp: dict) -> None:
-    fake_serp["payload"] = {"ok": True, "results": [_row(e, p) for e in ("yandex", "google") for p in (1, 2, 3)]}
-    hits = SerpProvider().search("q", limit=2, mode="both")
-    assert fake_serp["argv"] == ["/bin/serp", "snippets", "q", "--engine", "both", "--top", "10", "--json"]
-    assert [(h.engine, h.position) for h in hits] == [("yandex", 1), ("yandex", 2), ("google", 1), ("google", 2)]
+def test_serp_rounds_top_to_pages_and_cuts_to_limit(fake_serp: dict) -> None:
+    fake_serp["payload"] = {"ok": True, "results": [_row("google", p) for p in (1, 2, 3)]}
+    hits = SerpProvider().search("q", limit=2, mode="google")
+    assert fake_serp["argv"] == ["/bin/serp", "snippets", "q", "--engine", "google", "--top", "10", "--json"]
+    assert [(h.engine, h.position) for h in hits] == [("google", 1), ("google", 2)]
     assert hits[0].provider == "serp"
     assert hits[0].published is None
+
+
+def test_serp_engine_is_yandex_or_google_only() -> None:
+    with pytest.raises(InvalidArguments):
+        services.check_modes({"serp": "both"})
 
 
 def test_serp_default_engine_is_yandex(fake_serp: dict) -> None:

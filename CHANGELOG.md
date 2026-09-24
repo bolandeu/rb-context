@@ -21,7 +21,7 @@ write them at release time.
   (Exa 402, Tavily 432/433, Brave 402 / 429 `QUOTA_LIMITED`); видна в `sources[].error`,
   а при отказе всех — в `error.errors` по каждому провайдеру.
 - Провайдер `serp`: выдача Яндекса/Google со сниппетами через установленный CLI `serp`
-  (`serp snippets --json`, без зависимости от `rb-serp`), `--serp-engine yandex|google|both`.
+  (`serp snippets --json`, без зависимости от `rb-serp`), `--serp-engine yandex|google` (по умолчанию yandex).
 
 ### Changed
 

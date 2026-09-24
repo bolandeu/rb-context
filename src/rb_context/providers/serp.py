@@ -42,7 +42,7 @@ class SerpProvider(SearchProvider):
 
     name = "serp"
     summary = "Яндекс/Google — выдача и сниппеты через CLI serp"
-    modes = ("yandex", "google", "both")
+    modes = ("yandex", "google")  # первый — по умолчанию
     needs_api_key = False
 
     @classmethod
@@ -57,7 +57,7 @@ class SerpProvider(SearchProvider):
 
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
         top = min(100, max(10, -(-limit // 10) * 10))  # serp берёт выдачу страницами по 10
-        payload = _run_json(["snippets", query, "--engine", mode or "yandex", "--top", str(top)])
+        payload = _run_json(["snippets", query, "--engine", mode or self.modes[0], "--top", str(top)])
         if not payload.get("ok"):
             error = payload.get("error") or {}
             if error.get("code") == "AUTH_REQUIRED":
@@ -65,24 +65,17 @@ class SerpProvider(SearchProvider):
                 exc.action = error.get("action") or "Run 'serp auth login'."
                 raise exc
             raise ProviderError(self.name, error.get("message", "неизвестная ошибка"), action=error.get("action"))
-        by_engine: dict[str, int] = {}
-        hits = []
-        for row in payload.get("results", []):
-            engine = row["searchengine"]
-            if by_engine.get(engine, 0) >= limit:
-                continue
-            by_engine[engine] = by_engine.get(engine, 0) + 1
-            hits.append(
-                SearchHit(
-                    provider=self.name,
-                    engine=engine,
-                    query=query,
-                    position=row["serp_position"],
-                    url=row["url"],
-                    domain=row["domain"],
-                    title=row["title"],
-                    snippet=row.get("snippet") or "",
-                    published=row.get("pubdate") or None,
-                )
+        return [
+            SearchHit(
+                provider=self.name,
+                engine=row["searchengine"],
+                query=query,
+                position=row["serp_position"],
+                url=row["url"],
+                domain=row["domain"],
+                title=row["title"],
+                snippet=row.get("snippet") or "",
+                published=row.get("pubdate") or None,
             )
-        return hits
+            for row in payload.get("results", [])[:limit]
+        ]

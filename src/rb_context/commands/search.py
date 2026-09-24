@@ -74,7 +74,7 @@ def search(
       context search "запрос" -p tavily                   # только tavily
       context search "запрос" -p exa,serp -n 5            # два провайдера
       context search "запрос" -p all                      # все
-      context search "купить диван" -p serp --serp-engine both
+      context search "купить диван" -p serp --serp-engine google
       context search "сравнение векторных БД" -p exa --exa-mode deep
     """
     providers = services.resolve_providers(provider, Path(ctx.obj.get("project") or Path.cwd()))

@@ -50,7 +50,8 @@ context search "rag chunking strategies"                  # только exa (п
 context search "запрос" -p tavily                         # один конкретный
 context search "запрос" -p exa,serp -n 5                  # несколько, по 5 результатов
 context search "запрос" -p all                            # все
-context search "купить диван" -p serp --serp-engine both  # Яндекс и Google
+context search "купить диван" -p serp                     # выдача Яндекса
+context search "купить диван" -p serp --serp-engine google
 context search "сравнение векторных БД" -p exa --exa-mode deep
 context search "news about uv" --json                     # для агентов
 ```
@@ -62,7 +63,7 @@ context search "news about uv" --json                     # для агенто�
 `QUOTA_EXCEEDED`.
 
 Режимы: `--exa-mode` (auto, fast, instant, deep-lite, deep, deep-reasoning),
-`--tavily-mode` (basic, advanced, fast, ultra-fast), `--serp-engine` (yandex, google, both;
+`--tavily-mode` (basic, advanced, fast, ultra-fast), `--serp-engine` (yandex или google;
 по умолчанию yandex). У Brave режимов нет.
 
 ## Почему такие библиотеки
