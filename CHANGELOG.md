@@ -10,6 +10,14 @@ one of added/changed/deprecated/removed/fixed/security), and
 
 <!-- towncrier release notes start -->
 
+## [0.2.0] - 2026-09-27
+
+### Changed
+
+- Провайдер `serp` требует CLI serp ≥ 0.4.0 (читает `auth status --json` в форме §8: `ok` и `credentials[].status`); нет serp или он старше — ошибка `DEPENDENCY_TOO_OLD` (exit 1) с командой установки/обновления вместо `PROVIDER_ERROR`.
+- Шаблон cli-generator v1.2.0 и стандарт релизов: версия из git-тега, changelog из фрагментов, единый гейт `scripts/release.py --check`, контракт справки (`Example:` у каждой команды, снапшоты). **Ломающее:** `context auth status` теперь отдаёт отчёт §8 (`tool`, `version`, `checked_at`, `credentials[]` со `status`) вместо `{provider, authenticated}`, `--provider` необязателен, `--check` проверяет ключи вызовом API; exit 3, если не в порядке exa или неверен любой ключ (tavily и brave необязательны). Провайдеры создаются без ключа — ключ читается при первом запросе.
+
+
 ## [0.1.0] - 2026-09-27
 
 ### Added

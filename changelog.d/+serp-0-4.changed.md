@@ -1,1 +1,0 @@
-Провайдер `serp` требует CLI serp ≥ 0.4.0 (читает `auth status --json` в форме §8: `ok` и `credentials[].status`); нет serp или он старше — ошибка `DEPENDENCY_TOO_OLD` (exit 1) с командой установки/обновления вместо `PROVIDER_ERROR`.
