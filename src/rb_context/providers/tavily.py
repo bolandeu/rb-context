@@ -24,6 +24,7 @@ class TavilyProvider(HttpProvider, SearchProvider):
     summary = "Tavily — поиск с выжимкой контента под LLM"
     modes = ("basic", "advanced", "fast", "ultra-fast")
     base_url = "https://api.tavily.com"
+    required = False  # поиск по умолчанию — через exa
 
     def __init__(self, client: TavilyClient | None = None) -> None:
         # SDK сводит 403, 432 и 433 в один ForbiddenError без кода — код запоминаем сами.

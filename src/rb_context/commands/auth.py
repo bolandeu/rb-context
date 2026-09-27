@@ -90,7 +90,7 @@ def auth_status(
     """Report every provider's credential: where it comes from and whether it works. Never prints values.
 
     Without --check only presence is reported (status `unchecked` or `missing`).
-    exa and tavily are required, brave is optional; serp keeps its own keys
+    exa is required, tavily and brave are optional; serp keeps its own keys
     (`serp auth status`) and isn't listed. --check is free for exa (an empty
     /search request, rejected before billing) and tavily (/usage, with the
     remaining credits as `quota`); brave has no free call, so it makes one search.

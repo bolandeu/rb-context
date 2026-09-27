@@ -45,8 +45,8 @@ context auth status --check     # каждый ключ: откуда и раб�
 
 У провайдера `serp` своих ключей в context нет: его доступы (XML River / XMLStock)
 хранит и проверяет сам `serp` — `serp auth login`. `context doctor` спрашивает у него
-`serp auth status`. В `context auth status` serp не входит; exa и tavily — обязательные,
-brave — необязательный (без ключа не ошибка).
+`serp auth status`. В `context auth status` serp не входит; exa — обязательный,
+tavily и brave — необязательные (без ключа не ошибка).
 
 ## Использование
 

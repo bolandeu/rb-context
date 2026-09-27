@@ -51,8 +51,8 @@ uv tool install "git+ssh://git@github.com/bolandeu/context.git"
   (`CONTEXT_EXA_API_KEY`, `CONTEXT_TAVILY_API_KEY`, `CONTEXT_BRAVE_API_KEY`;
   у serp — свои, см. выше),
   никогда в аргументах или конфиге. Проверка — `context auth status --check --json`
-  (откуда каждый ключ и работает ли, без значений; exit 3 — не в порядке exa/tavily
-  или неверен любой; brave необязателен) или `context doctor --json`;
+  (откуда каждый ключ и работает ли, без значений; exit 3 — не в порядке exa
+  или неверен любой; tavily и brave необязательны) или `context doctor --json`;
   никогда не проси пользователя вставить ключ в командную строку.
 - **Стоимость.** Каждый запрос платный у каждого провайдера. Глубокие
   режимы (`--exa-mode deep*`, `--tavily-mode advanced`) дороже и медленнее —
