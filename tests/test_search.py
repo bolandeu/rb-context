@@ -11,10 +11,18 @@ import pytest
 import requests
 from tavily.errors import ForbiddenError, InvalidAPIKeyError, UsageLimitExceededError
 
-from rb_context.core import services
-from rb_context.core.errors import AuthRequired, InvalidArguments, ProviderError, QuotaExceeded
+from rb_context.core import deps, services
+from rb_context.core.errors import AuthRequired, DependencyTooOld, InvalidArguments, ProviderError, QuotaExceeded
 from rb_context.core.models import SearchHit
-from rb_context.providers import BraveProvider, ExaProvider, SearchProvider, SerpProvider, TavilyProvider
+from rb_context.providers import (
+    BraveProvider,
+    ExaProvider,
+    Health,
+    Quota,
+    SearchProvider,
+    SerpProvider,
+    TavilyProvider,
+)
 from rb_context.providers import serp as serp_module
 
 from .test_cli import init, invoke, invoke_json
@@ -165,8 +173,9 @@ def test_brave_401_is_auth_required() -> None:
 @pytest.mark.parametrize("cls", [ExaProvider, TavilyProvider, BraveProvider])
 def test_provider_without_key_is_auth_required(cls: type, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("rb_context.credentials.manager.get_secret", lambda provider, field="api_key": None)
+    provider = cls()  # ключ читается при первом запросе: auth status --check создаёт провайдеров без ключей
     with pytest.raises(AuthRequired):
-        cls()
+        provider.search("q", limit=1)
 
 
 def test_provider_reads_key_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -380,7 +389,7 @@ def test_partial_quota_is_visible_in_sources(tmp_path: Path, fake_providers: dic
 def fake_serp(monkeypatch: pytest.MonkeyPatch) -> dict:
     """Подменить `serp ... --json`: `state["payload"]` — что он напечатает, `state["argv"]` — с чем вызван."""
     state: dict = {"payload": {"ok": True, "results": []}, "stdout": None, "argv": None}
-    monkeypatch.setattr(serp_module.shutil, "which", lambda name: "/bin/serp")
+    monkeypatch.setattr(serp_module.deps, "require_cli", lambda name, version: "/bin/serp")
 
     def fake_run(argv, **kwargs):
         state["argv"] = argv
@@ -468,20 +477,52 @@ def test_serp_timeout_is_provider_error(fake_serp: dict, monkeypatch: pytest.Mon
 
 
 def test_serp_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(serp_module.shutil, "which", lambda name: None)
-    with pytest.raises(ProviderError) as exc_info:
+    monkeypatch.setattr(deps, "installed_cli_version", lambda name: (None, None))
+    with pytest.raises(DependencyTooOld) as exc_info:
         SerpProvider().search("q", limit=1)
-    assert "uv tool install" in (exc_info.value.action or "")
+    assert exc_info.value.code == "DEPENDENCY_TOO_OLD"
+    assert f'uv tool install "git+https://github.com/bolandeu/serp.git@v{serp_module.MIN_SERP}"' in (
+        exc_info.value.action or ""
+    )
     ok, detail = SerpProvider.check()
     assert not ok
     assert "uv tool install" in (detail or "")
 
 
-@pytest.mark.parametrize(("authenticated", "ok"), [(True, True), (False, False)])
-def test_serp_check_asks_serp_itself(fake_serp: dict, authenticated: bool, ok: bool) -> None:
-    fake_serp["payload"] = {"ok": True, "authenticated": authenticated}
-    assert SerpProvider.check()[0] is ok
+def test_serp_too_old(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(deps, "installed_cli_version", lambda name: ("/bin/serp", "0.3.0"))
+    with pytest.raises(DependencyTooOld) as exc_info:
+        SerpProvider().search("q", limit=1)
+    assert "is 0.3.0" in exc_info.value.message and serp_module.MIN_SERP in exc_info.value.message
+    assert "uv tool upgrade serp" in (exc_info.value.action or "")
+
+
+def _serp_status(ok: bool, *statuses: str) -> dict:
+    """`serp auth status --json` 0.4.0+ (§8 стандарта)."""
+    payload: dict = {
+        "ok": ok,
+        "tool": "serp",
+        "credentials": [
+            {"provider": name, "required": name == "xmlriver", "status": status}
+            for name, status in zip(("xmlriver", "xmlstock"), statuses, strict=False)
+        ],
+    }
+    if not ok:
+        payload["error"] = {"code": "CREDENTIALS_UNHEALTHY", "message": "m", "action": "Run 'serp auth login'."}
+    return payload
+
+
+def test_serp_check_ok(fake_serp: dict) -> None:
+    fake_serp["payload"] = _serp_status(True, "unchecked", "missing")
+    assert SerpProvider.check() == (True, None)
     assert fake_serp["argv"] == ["/bin/serp", "auth", "status", "--json"]
+
+
+def test_serp_check_names_bad_credentials(fake_serp: dict) -> None:
+    fake_serp["payload"] = _serp_status(False, "missing", "unchecked")
+    ok, detail = SerpProvider.check()
+    assert not ok
+    assert detail == "serp: xmlriver — Run 'serp auth login'."
 
 
 def test_auth_login_for_serp_points_to_serp(fake_serp: dict) -> None:
@@ -495,3 +536,77 @@ def test_human_output_shows_serp_engine(tmp_path: Path, fake_serp: dict) -> None
     result = invoke("--project", str(tmp_path), "search", "q", "-p", "serp", "--serp-engine", "google")
     assert result.exit_code == 0
     assert "https://google.ru/1 · serp/google #1" in result.stdout
+
+
+# --- health_check (context auth status --check) -------------------------------
+
+
+class _FakeExaRequest:
+    def __init__(self, error: Exception | None) -> None:
+        self.error = error
+
+    def request(self, endpoint, data=None, **kwargs):
+        if self.error:
+            raise self.error
+        return {}
+
+
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (ValueError('Request failed with status code 400: {"error":"Invalid request body | Validation"}'), "ok"),
+        (None, "ok"),
+        (ValueError("Request failed with status code 402: NO_MORE_CREDITS"), "quota_exhausted"),
+    ],
+)
+def test_exa_health_check(error: Exception | None, status: str) -> None:
+    provider = ExaProvider(_FakeExaRequest(error))  # ty: ignore[invalid-argument-type]
+    assert provider.health_check().status == status
+
+
+@pytest.mark.parametrize(
+    ("error", "raised"),
+    [
+        (ValueError("Request failed with status code 401: Invalid API key"), AuthRequired),
+        (ValueError("Request failed with status code 400: something else"), ProviderError),
+    ],
+)
+def test_exa_health_check_failures(error: Exception, raised: type[Exception]) -> None:
+    with pytest.raises(raised):
+        ExaProvider(_FakeExaRequest(error)).health_check()  # ty: ignore[invalid-argument-type]
+
+
+def _tavily_usage(account: dict) -> TavilyProvider:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/usage"
+        assert request.headers["Authorization"] == "Bearer k"
+        return httpx.Response(200, json={"key": {"usage": 1}, "account": account})
+
+    provider = TavilyProvider()
+    provider.transport = httpx.MockTransport(handler)
+    return provider
+
+
+def test_tavily_health_check_reports_quota(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTEXT_TAVILY_API_KEY", "k")
+    health = _tavily_usage({"plan_limit": 1000, "plan_usage": 16}).health_check()
+    assert (health.status, health.quota) == ("ok", Quota(remaining=984, limit=1000, unit="credits"))
+
+
+def test_tavily_health_check_exhausted_unless_paygo_left(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTEXT_TAVILY_API_KEY", "k")
+    assert _tavily_usage({"plan_limit": 10, "plan_usage": 10}).health_check().status == "quota_exhausted"
+    paygo = {"plan_limit": 10, "plan_usage": 10, "paygo_limit": 5, "paygo_usage": 1}
+    assert _tavily_usage(paygo).health_check().status == "ok"
+    assert _tavily_usage({}).health_check() == Health()
+
+
+def test_brave_health_check() -> None:
+    assert _brave(lambda request: httpx.Response(200, json={})).health_check().status == "ok"
+    quota = _brave(lambda request: httpx.Response(402, text="{}")).health_check()
+    assert quota.status == "quota_exhausted"
+
+
+def test_serp_has_no_context_credentials() -> None:
+    assert SerpProvider.credential_fields == ()
+    assert SerpProvider().health_check() == Health()

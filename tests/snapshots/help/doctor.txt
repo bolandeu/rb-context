@@ -1,0 +1,17 @@
+
+ Usage: context doctor [OPTIONS]
+
+ Диагностика: версия, проект, настройки, связка ключей, ключи провайдеров.
+
+ Always exits 0 — the report itself is the result; `healthy` says
+ whether every check passed.
+
+ Example: context doctor --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --json             Emit machine-readable JSON output.                                            │
+│ --quiet            Suppress non-essential output.                                                │
+│ --verbose          Emit extra diagnostic output.                                                 │
+│ --help             Show this message and exit.                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

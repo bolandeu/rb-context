@@ -5,7 +5,7 @@ import re
 
 from ..core.errors import ProviderError, QuotaExceeded
 from ..core.models import SearchHit, extract_domain
-from .base import SearchProvider
+from .base import Health, SearchProvider
 from .http import HttpProvider
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -24,12 +24,21 @@ class BraveProvider(HttpProvider, SearchProvider):
     name = "brave"
     summary = "Brave — независимый веб-индекс, описание и доп. сниппеты"
     base_url = "https://api.search.brave.com/res/v1"
+    required = False  # context работает и без Brave
 
     def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key or self.require_api_key()
+        self._api_key = api_key  # None — ключ читается при первом запросе
 
     def auth_headers(self) -> dict[str, str]:
-        return {"X-Subscription-Token": self._api_key, "Accept": "application/json"}
+        return {"X-Subscription-Token": self._api_key or self.require_api_key(), "Accept": "application/json"}
+
+    def health_check(self) -> Health:
+        """Поиск с `count=1`: бесплатного эндпоинта у Brave нет, это самый дешёвый запрос."""
+        try:
+            self.search("test", limit=1)
+        except QuotaExceeded as exc:
+            return Health(status="quota_exhausted", message=exc.message)
+        return Health()
 
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
         try:

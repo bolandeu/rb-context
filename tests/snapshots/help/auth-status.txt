@@ -1,0 +1,28 @@
+
+ Usage: context auth status [OPTIONS]
+
+ Report every provider's credential: where it comes from and whether it works. Never prints values.
+
+ Without --check only presence is reported (status `unchecked` or `missing`).
+ exa and tavily are required, brave is optional; serp keeps its own keys
+ (`serp auth status`) and isn't listed. --check is free for exa (an empty
+ /search request, rejected before billing) and tavily (/usage, with the
+ remaining credits as `quota`); brave has no free call, so it makes one search.
+ Exits 0 when every required provider is ok/unchecked (an optional one may be
+ missing), 3 when any required provider has a problem or any credential is
+ invalid/expired, 2 on a usage error. The --json shape is a cross-tool contract:
+ `tool`, `version`, `checked_at`, `credentials[]` with `provider`, `required`,
+ `fields`, `source`, `source_ref`, `status`, `expires_at`, `quota`, `message`.
+
+ Example: context auth status --check --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --check                    Also make one cheap read-only call per provider (10 s timeout) to     │
+│                            prove each works.                                                     │
+│ --provider  -p      <str>  Report only this provider (default: all with keys: exa, tavily,       │
+│                            brave).                                                               │
+│ --json                     Emit machine-readable JSON output.                                    │
+│ --quiet                    Suppress non-essential output.                                        │
+│ --help                     Show this message and exit.                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

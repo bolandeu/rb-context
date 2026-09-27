@@ -9,6 +9,7 @@ import httpx
 
 from ..core.errors import AuthRequired, ProviderError
 from ..core.version import CLI_NAME, DEV_VERSION, installed_version
+from .base import Provider
 
 log = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ log = logging.getLogger(__name__)
 _RETRY_STATUSES = frozenset({429, 502, 503, 504})
 
 
-class HttpProvider:
+class HttpProvider(Provider):
     """Base class for one HTTP API integration.
 
     Subclass per service: set `name` and `base_url`, override
@@ -33,11 +34,13 @@ class HttpProvider:
     - any other 4xx / 5xx             -> ProviderError with the status
     - non-JSON body from get_json     -> ProviderError
 
+    Like every provider it must implement `health_check()` (see `Provider`).
+
     `transport` exists for tests (`httpx.MockTransport`); leave it None
     in real code.
     """
 
-    name: str = "default"
+    abstract = True
     base_url: str = ""
     timeout: float = 30.0
     retries: int = 2

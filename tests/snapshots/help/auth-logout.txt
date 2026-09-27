@@ -1,0 +1,18 @@
+
+ Usage: context auth logout [OPTIONS]
+
+ Удалить API-ключ провайдера из связки ключей ОС.
+
+ Example: context auth logout --provider exa
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ *  --provider  -p      <str>  Провайдер. Доступны: exa (Exa — нейропоиск, хайлайты страниц);     │
+│                               tavily (Tavily — поиск с выжимкой контента под LLM); brave (Brave  │
+│                               — независимый веб-индекс, описание и доп. сниппеты); serp          │
+│                               (Яндекс/Google — выдача и сниппеты через CLI serp).                │
+│                               [required]                                                         │
+│    --json                     Emit machine-readable JSON output.                                 │
+│    --quiet                    Suppress non-essential output.                                     │
+│    --help                     Show this message and exit.                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

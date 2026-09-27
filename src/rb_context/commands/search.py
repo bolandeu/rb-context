@@ -64,21 +64,21 @@ def search(
 
     snippet — текст-контекст провайдера: exa — хайлайты страницы, tavily —
     выжимка content, brave — описание и доп. сниппеты, serp — сниппет из
-    выдачи Яндекса/Google (нужен установленный CLI serp со своими ключами).
+    выдачи Яндекса/Google (нужен установленный CLI serp ≥ 0.4.0 со своими
+    ключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`).
 
     --json: {"ok": true, "count": N, "results": [{provider, engine, query,
     position, url, domain, title, snippet, published, score}, ...], "sources":
     [{provider, query, ok, count, error}, ...]}. Без --json — markdown в stdout.
 
     \b
-    Примеры:
-      context search "rag chunking strategies"            # только exa
-      context search "запрос" -p tavily                   # только tavily
-      context search "запрос" -p exa,serp -n 5            # два провайдера
-      context search "запрос" -p all                      # все
-      context search "купить диван" -p serp --serp-engine google
-      context search "купить диван" -p serp --serp-engine yandex,google
-      context search "сравнение векторных БД" -p exa --exa-mode deep
+    Example: {cli} search "rag chunking strategies"            # только exa
+             {cli} search "запрос" -p tavily                   # только tavily
+             {cli} search "запрос" -p exa,serp -n 5            # два провайдера
+             {cli} search "запрос" -p all                      # все
+             {cli} search "купить диван" -p serp --serp-engine google
+             {cli} search "купить диван" -p serp --serp-engine yandex,google
+             {cli} search "сравнение векторных БД" -p exa --exa-mode deep
     """
     providers = services.resolve_providers(provider, Path(ctx.obj.get("project") or Path.cwd()))
     output.vecho(ctx, f"Провайдеры: {', '.join(providers)}")

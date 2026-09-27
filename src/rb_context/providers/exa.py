@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import functools
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import requests
 from exa_py import Exa
 
 from ..core.errors import AuthRequired, ProviderError, QuotaExceeded
 from ..core.models import SearchHit, extract_domain
-from .base import SearchProvider
+from .base import Health, SearchProvider
 
 # exa-py сообщает о HTTP-ошибке только текстом: ValueError("Request failed with status code 401: ...").
 _STATUS_RE = re.compile(r"status code (\d{3})")
@@ -24,11 +27,17 @@ class ExaProvider(SearchProvider):
     modes = ("auto", "fast", "instant", "deep-lite", "deep", "deep-reasoning")
 
     def __init__(self, client: Exa | None = None) -> None:
-        self._client = client or Exa(api_key=self.require_api_key())
+        self._given = client  # None — клиент с ключом создаётся при первом запросе
 
-    def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
+    @functools.cached_property
+    def _client(self) -> Exa:
+        return self._given or Exa(api_key=self.require_api_key())
+
+    @contextmanager
+    def _errors(self) -> Iterator[None]:
+        """Ошибки exa-py → AuthRequired / QuotaExceeded / ProviderError."""
         try:
-            response = self._client.search(query, num_results=limit, type=mode, contents={"highlights": True})
+            yield
         except ValueError as exc:
             match = _STATUS_RE.search(str(exc))
             status = int(match.group(1)) if match else None
@@ -40,6 +49,29 @@ class ExaProvider(SearchProvider):
             raise ProviderError(self.name, str(exc)[:300], status=status) from exc
         except requests.RequestException as exc:
             raise ProviderError(self.name, f"{type(exc).__name__}: {exc}"[:300]) from exc
+
+    def health_check(self) -> Health:
+        """`POST /search` без запроса: ключ проверяется до тела, ответ 400 — ключ принят, поиск не тарифицируется.
+
+        Бесплатного чтения у Exa нет (Research API закрыт — 410, Websets — только Pro).
+        Опора на порядок проверок недокументирована: если Exa начнёт валидировать
+        тело раньше ключа, неверный ключ тоже даст 400 — поэтому 400 засчитывается
+        только с текстом о невалидном теле.
+        """
+        try:
+            with self._errors():
+                self._client.request("/search", {"numResults": 1})
+        except QuotaExceeded as exc:
+            return Health(status="quota_exhausted", message=exc.message)
+        except ProviderError as exc:
+            if exc.status == 400 and "Invalid request body" in exc.message:
+                return Health()
+            raise
+        return Health()
+
+    def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
+        with self._errors():
+            response = self._client.search(query, num_results=limit, type=mode, contents={"highlights": True})
         return [
             SearchHit(
                 provider=self.name,

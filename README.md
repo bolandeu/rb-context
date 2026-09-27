@@ -20,6 +20,9 @@ uv tool install "git+https://github.com/bolandeu/context.git"
 падает с ошибкой авторизации — один раз `gh auth login` (или `gh auth setup-git`, если
 `gh` залогинен через `--with-token`), либо SSH-вариант:
 
+The version is the git tag (`vX.Y.Z`) — `pyproject.toml` has no `version =`.
+Each change adds a changelog fragment instead of editing `CHANGELOG.md`:
+
 ```bash
 uv tool install "git+ssh://git@github.com/bolandeu/context.git"
 ```
@@ -33,6 +36,7 @@ context auth login -p exa       # спросит API-ключ
 context auth login -p tavily
 context auth login -p brave
 context doctor                  # версия, проект, какие ключи есть
+context auth status --check     # каждый ключ: откуда и работает ли (exit 3 — проблема)
 ```
 
 Без keychain (CI, headless Linux) — переменные `CONTEXT_EXA_API_KEY`,
@@ -41,7 +45,8 @@ context doctor                  # версия, проект, какие клю�
 
 У провайдера `serp` своих ключей в context нет: его доступы (XML River / XMLStock)
 хранит и проверяет сам `serp` — `serp auth login`. `context doctor` спрашивает у него
-`serp auth status`.
+`serp auth status`. В `context auth status` serp не входит; exa и tavily — обязательные,
+brave — необязательный (без ключа не ошибка).
 
 ## Использование
 
@@ -80,9 +85,10 @@ context search "news about uv" --json                     # для агенто�
 контракт для агентов (конверт, коды ошибок), ключи XML River / XMLStock остаются в serp и
 не дублируются, версии двух пакетов не связаны. Импорт `rb-serp` потребовал бы зависимость
 от приватного git-репозитория в `uv.lock` (CI её не скачает) и синхронных релизов.
-Цена — serp должен быть установлен отдельно:
-`uv tool install "git+https://github.com/bolandeu/serp.git"`; без него провайдер `serp`
-отвечает `PROVIDER_ERROR` с этой командой в `action`, остальные работают.
+Цена — serp должен быть установлен отдельно, не старше 0.4.0 (`MIN_SERP` в
+`providers/serp.py`, проверяется по `serp --version`):
+`uv tool install "git+https://github.com/bolandeu/serp.git"`; без него или со старым провайдер
+`serp` отвечает `DEPENDENCY_TOO_OLD` с командой установки/обновления в `action`, остальные работают.
 
 Отвергнуто: LangChain / LlamaIndex tools для этих сервисов — тяжёлая зависимость
 ради трёх вызовов, и ошибки всё равно пришлось бы переводить в коды CLI. Исключения
@@ -94,21 +100,31 @@ SDK переводятся в `AuthRequired` / `ProviderError` в самих м�
 ```bash
 uv sync
 uv run context --help
-uv run ruff check . && uv run ruff format --check . && uv run ty check && uv run pytest
-scripts/install_hooks.sh  # pre-commit предупреждает об устаревших docstring команд (это их --help)
+uv run scripts/release.py --check   # весь гейт (его же гоняют релиз и CI) — перед каждым коммитом
+scripts/install_hooks.sh            # один раз на клон: git берёт хуки из .githooks/
+uv run pytest --snapshot-update     # после правки справки команды; смотреть tests/snapshots/help/
 ```
 
+Гейт: `uv lock --check`, ruff (с правилами безопасности `S`), ty, pytest с порогом
+покрытия, снапшоты `--help`, форма `auth status`, фрагмент changelog, сборка и установка
+колеса во временный venv; `osv-scanner` по `uv.lock`, если он установлен.
+
 Новый провайдер: модуль в `src/rb_context/providers/` с подклассом `SearchProvider`
-и строка в `PROVIDERS` (`providers/__init__.py`).
+(`name`, `required`, `search`, `health_check`) и строка в `PROVIDERS` (`providers/__init__.py`).
 
 ## Релиз
 
+Версия — git-тег `vX.Y.Z`, строки `version =` в `pyproject.toml` нет. Каждое изменение —
+фрагмент changelog, `CHANGELOG.md` руками не правится:
+
 ```bash
-uv run scripts/release.py patch   # или minor / major
+uv run towncrier create +<slug>.<type>.md -c "Что изменилось — для человека."
+uv run scripts/release.py patch   # или minor / major (SemVer; на 0.x: patch — фикс/фича, minor — ломающее)
+git push --follow-tags
 ```
 
-Поднимает версию в `pyproject.toml`, датирует `## [Unreleased]` в `CHANGELOG.md`,
-коммитит, ставит тег `v<version>` и пушит.
+`release.py` работает только на чистом `main`, не отстающем от origin: гонит гейт,
+собирает `CHANGELOG.md` из `changelog.d/`, коммитит `Release vX.Y.Z` и ставит тег; пуш — за вами.
 
 ## Архитектура
 

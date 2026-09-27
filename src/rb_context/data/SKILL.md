@@ -43,14 +43,16 @@ uv tool install "git+ssh://git@github.com/bolandeu/context.git"
 - **Проект необязателен.** Свой набор по умолчанию — `context init
   --non-interactive`, затем `context config set providers exa,serp`.
 - **serp — отдельный CLI.** `rb-serp` не зависимость context: провайдер `serp`
-  вызывает установленную команду `serp`. Не установлена — в `action` ошибки
-  команда установки; ключи serp — `serp auth login`, не `context auth login`.
+  вызывает установленную команду `serp` не старше 0.4.0. Нет или старая —
+  ошибка `DEPENDENCY_TOO_OLD` с командой установки/обновления в `action`; ключи serp — `serp auth login`, не `context auth login`.
 - **`--non-interactive`** на всём, что может спросить: вместо зависания —
   структурированная ошибка.
 - **Ключи** — в связке ключей ОС или env `CONTEXT_<PROVIDER>_API_KEY`
   (`CONTEXT_EXA_API_KEY`, `CONTEXT_TAVILY_API_KEY`, `CONTEXT_BRAVE_API_KEY`;
   у serp — свои, см. выше),
-  никогда в аргументах или конфиге. Проверка — `context doctor --json`;
+  никогда в аргументах или конфиге. Проверка — `context auth status --check --json`
+  (откуда каждый ключ и работает ли, без значений; exit 3 — не в порядке exa/tavily
+  или неверен любой; brave необязателен) или `context doctor --json`;
   никогда не проси пользователя вставить ключ в командную строку.
 - **Стоимость.** Каждый запрос платный у каждого провайдера. Глубокие
   режимы (`--exa-mode deep*`, `--tavily-mode advanced`) дороже и медленнее —

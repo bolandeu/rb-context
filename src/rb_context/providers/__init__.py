@@ -6,12 +6,15 @@
 официальным SDK оборачивается им (exa, tavily), без SDK — `HttpProvider`
 (brave), CLI — subprocess с его `--json` (serp); во всех случаях наружу
 только `ProviderError` / `AuthRequired`.
+
+Каждый провайдер реализует `health_check()` — это то, что проверяет
+`context auth status --check` (см. `base.Provider`).
 """
 
 from __future__ import annotations
 
 from ..core.errors import InvalidArguments
-from .base import SearchProvider
+from .base import Health, Provider, Quota, SearchProvider, all_providers
 from .brave import BraveProvider
 from .exa import ExaProvider
 from .http import HttpProvider
@@ -42,10 +45,14 @@ __all__ = [
     "PROVIDERS",
     "BraveProvider",
     "ExaProvider",
+    "Health",
     "HttpProvider",
+    "Provider",
+    "Quota",
     "SearchProvider",
     "SerpProvider",
     "TavilyProvider",
+    "all_providers",
     "provider_class",
     "providers_help",
 ]

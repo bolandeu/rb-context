@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import typer
+from rich.markup import escape
 
-from .. import output
-from ..core.errors import InvalidArguments
+from .. import output, providers
+from ..core.errors import CredentialsUnhealthy, InvalidArguments
+from ..core.version import CLI_NAME, DEV_VERSION, installed_version
+from ..credentials import health
 from ..credentials import manager as credentials
 from ..providers import provider_class, providers_help
 
@@ -31,6 +34,8 @@ def login(
     Ключ берётся из CONTEXT_<PROVIDER>_API_KEY (например CONTEXT_EXA_API_KEY),
     если переменная задана, иначе спрашивается. С --non-interactive и без
     переменной — ошибка, а не вопрос.
+
+    Example: {cli} auth login --provider exa
     """
     _require_api_key_provider(provider)
     secret = credentials.read_secret_from_env(provider)
@@ -56,7 +61,10 @@ def logout(
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
 ) -> None:
-    """Удалить API-ключ провайдера из связки ключей ОС."""
+    """Удалить API-ключ провайдера из связки ключей ОС.
+
+    Example: {cli} auth logout --provider exa
+    """
     _require_api_key_provider(provider)
     credentials.delete_secret(provider)
     output.emit_success(
@@ -70,16 +78,47 @@ def logout(
 @output.guard
 def auth_status(
     ctx: typer.Context,
-    provider: str = ProviderOption,
+    check: bool = typer.Option(
+        False, "--check", help="Also make one cheap read-only call per provider (10 s timeout) to prove each works."
+    ),
+    provider: str | None = typer.Option(
+        None, "--provider", "-p", help="Report only this provider (default: all with keys: exa, tavily, brave)."
+    ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
 ) -> None:
-    """Проверить, есть ли ключ провайдера (в env или связке ключей)."""
-    authenticated, _ = provider_class(provider).check()
-    output.emit_success(
-        ctx,
-        {"provider": provider, "authenticated": authenticated},
-        render_human=lambda d: output.human.echo(
-            f"{'Authenticated' if d['authenticated'] else 'Not authenticated'} for '{d['provider']}'."
-        ),
-    )
+    """Report every provider's credential: where it comes from and whether it works. Never prints values.
+
+    Without --check only presence is reported (status `unchecked` or `missing`).
+    exa and tavily are required, brave is optional; serp keeps its own keys
+    (`serp auth status`) and isn't listed. --check is free for exa (an empty
+    /search request, rejected before billing) and tavily (/usage, with the
+    remaining credits as `quota`); brave has no free call, so it makes one search.
+    Exits 0 when every required provider is ok/unchecked (an optional one may be
+    missing), 3 when any required provider has a problem or any credential is
+    invalid/expired, 2 on a usage error. The --json shape is a cross-tool contract:
+    `tool`, `version`, `checked_at`, `credentials[]` with `provider`, `required`,
+    `fields`, `source`, `source_ref`, `status`, `expires_at`, `quota`, `message`.
+
+    Example: {cli} auth status --check --json
+    """
+    known = providers.all_providers()
+    selected = health.select(known, provider)
+    if provider is not None and not any(cls.credential_fields for cls in selected):
+        names = ", ".join(cls.name for cls in known if cls.credential_fields) or "none"
+        raise InvalidArguments(f"Unknown provider '{provider}' (known: {names}).")
+    payload = health.report(CLI_NAME, installed_version() or DEV_VERSION, selected, check=check, only=provider)
+    problems = {entry["provider"]: entry["status"] for entry in payload["credentials"] if health.is_problem(entry)}
+    output.emit_report(ctx, payload, _render_status, CredentialsUnhealthy(problems) if problems else None)
+
+
+def _render_status(payload: dict) -> None:
+    if not payload["credentials"]:
+        output.human.echo("No providers with credentials.")
+    for entry in payload["credentials"]:
+        mark = {"ok": "[green]✓[/green]", "unchecked": "[dim]·[/dim]"}.get(entry["status"], "[red]✗[/red]")
+        optional = "" if entry["required"] else " (optional)"
+        detail = f" — {entry['message']}" if entry["message"] else ""
+        expires = f", expires {entry['expires_at']}" if entry["expires_at"] else ""
+        line = f"{entry['provider']}{optional}: {entry['status']} ({entry['source']}: {entry['source_ref']}){expires}{detail}"
+        output.human.echo(f"{mark} {escape(line)}")
