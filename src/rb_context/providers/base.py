@@ -9,7 +9,7 @@ from typing import ClassVar, Literal
 
 from ..core.errors import AuthRequired
 from ..core.models import SearchHit
-from ..core.version import CLI_NAME
+from ..core.version import cli_name
 from ..credentials import manager as credentials
 
 # What a provider's own health check can conclude. `missing` and `unchecked`
@@ -39,10 +39,11 @@ class Provider:
 
     A concrete provider sets `name` and `credential_fields` (the field names
     it reads via `credentials.manager` under `credential_name`; `()` if it
-    needs none), `required` and `per_target` where they differ, and must
-    implement `health_check()` — `tests/test_providers.py` fails for any
-    provider that doesn't. It must be constructible with no arguments:
-    `auth status --check` instantiates every provider found in this package.
+    needs none), `required`, `per_target` and `legacy_env` where they
+    differ, and must implement `health_check()` — `tests/test_providers.py`
+    fails for any provider that doesn't. `auth status --check` gets an
+    instance via `for_health_check()`: `cls()` by default; a provider whose
+    constructor needs arguments overrides it (building them from config/env).
 
     Classes that are only bases for others set `abstract = True` in their own
     body; everything else defined under `providers/` is discovered by
@@ -60,7 +61,34 @@ class Provider:
     # `auth login --provider deploy:example.com`. `auth status` reports each
     # stored target separately and sets `target` before `health_check()`.
     per_target: ClassVar[bool] = False
+    # Older env var names still honoured, field -> name; looked up after the
+    # keychain unless `legacy_env_first`. In a subclass keep the annotation
+    # (ruff RUF012): legacy_env: ClassVar[dict[str, str]] = {"api_key": "XMLRIVER_TOKEN"}
+    legacy_env: ClassVar[dict[str, str]] = {}
+    legacy_env_first: ClassVar[bool] = False
+    # Other CLIs' credential namespaces (their command names) to read this
+    # provider's credential from after our own — e.g. wordstat reading the
+    # key `serp auth login` stored: shared_namespaces = ("serp",). Read-only.
+    shared_namespaces: ClassVar[tuple[str, ...]] = ()
     target: str | None = None
+
+    def credential(self) -> dict[str, str] | None:
+        """This provider's credential, resolved with all of the options above (use it in auth_headers())."""
+        manager = importlib.import_module(f"{__name__.split('.')[0]}.credentials.manager")
+        return manager.get_credential(
+            self.credential_name,
+            env_fields=list(self.credential_fields),
+            legacy_env=self.legacy_env,
+            legacy_env_first=self.legacy_env_first,
+            shared_namespaces=self.shared_namespaces,
+        )
+
+    @classmethod
+    def for_health_check(cls, target: str | None = None) -> Provider:
+        """An instance for `auth status --check` (for `target`, if per-target)."""
+        provider = cls()
+        provider.target = target
+        return provider
 
     @property
     def credential_name(self) -> str:
@@ -74,7 +102,11 @@ class Provider:
         authenticated read is) then `return Health()`; add `expires_at` for
         anything with a lifetime and `quota` if the API reports it. Just let
         `AuthRequired` / `ProviderError` propagate — `auth status` maps them
-        to `invalid` / `unreachable`. Runs with a 10 s timeout and no retries.
+        to `invalid` / `unreachable`. It must finish within 10 s and not retry,
+        and it is the provider's own client timeout that guarantees it —
+        `auth status` runs no watchdog thread. `HttpProvider.probe()` makes
+        exactly one request with a 10 s httpx timeout; anything else passes
+        `credentials.health.CHECK_TIMEOUT` (10 s) to what it calls.
         """
         raise NotImplementedError(f"{type(self).__name__} must implement health_check()")
 
@@ -83,7 +115,10 @@ def all_providers() -> list[type[Provider]]:
     """Every concrete Provider subclass defined in this package, sorted by name."""
     package = __name__.rsplit(".", 1)[0]
     for module in pkgutil.iter_modules(importlib.import_module(package).__path__):
-        importlib.import_module(f"{package}.{module.name}")
+        # base/http hold only abstract bases; importing http.py would pull in
+        # httpx for CLIs without HTTP providers (their subclasses import it anyway).
+        if module.name not in ("base", "http"):
+            importlib.import_module(f"{package}.{module.name}")
     found: set[type[Provider]] = set()
     pending = list(Provider.__subclasses__())
     while pending:
@@ -117,7 +152,7 @@ class SearchProvider(Provider, ABC):
         """Готов ли провайдер к работе и что сделать, если нет — для doctor."""
         if cls.load_api_key():
             return True, None
-        return False, f"run '{CLI_NAME} auth login --provider {cls.name}'"
+        return False, f"run '{cli_name()} auth login --provider {cls.name}'"
 
     @classmethod
     def load_api_key(cls) -> str | None:

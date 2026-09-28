@@ -11,6 +11,7 @@ from exa_py import Exa
 from ..core.errors import AuthRequired, ProviderError, QuotaExceeded
 from ..core.models import SearchHit, extract_domain
 from .base import Health, SearchProvider
+from .http import PROBE_TIMEOUT
 
 # exa-py сообщает о HTTP-ошибке только текстом: ValueError("Request failed with status code 401: ...").
 _STATUS_RE = re.compile(r"status code (\d{3})")
@@ -60,7 +61,7 @@ class ExaProvider(SearchProvider):
         """
         try:
             with self._errors():
-                self._client.request("/search", {"numResults": 1})
+                self._probe_search()
         except QuotaExceeded as exc:
             return Health(status="quota_exhausted", message=exc.message)
         except ProviderError as exc:
@@ -68,6 +69,18 @@ class ExaProvider(SearchProvider):
                 return Health()
             raise
         return Health()
+
+    def _probe_search(self) -> None:
+        """Тот же `POST /search`, что шлёт SDK, но одной попыткой за `PROBE_TIMEOUT`: exa-py таймаут не ставит.
+
+        Ошибку поднимает в виде exa-py (`ValueError` с кодом), чтобы её разобрал `_errors`.
+        """
+        client = self._client
+        response = requests.post(
+            f"{client.base_url}/search", json={"numResults": 1}, headers=client.headers, timeout=PROBE_TIMEOUT
+        )
+        if response.status_code >= 400:
+            raise ValueError(f"Request failed with status code {response.status_code}: {response.text}")
 
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
         with self._errors():

@@ -5,6 +5,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 
 import httpx
 import pytest
@@ -23,6 +24,7 @@ from rb_context.providers import (
     SerpProvider,
     TavilyProvider,
 )
+from rb_context.providers import exa as exa_module
 from rb_context.providers import serp as serp_module
 
 from .test_cli import init, invoke, invoke_json
@@ -389,7 +391,7 @@ def test_partial_quota_is_visible_in_sources(tmp_path: Path, fake_providers: dic
 def fake_serp(monkeypatch: pytest.MonkeyPatch) -> dict:
     """Подменить `serp ... --json`: `state["payload"]` — что он напечатает, `state["argv"]` — с чем вызван."""
     state: dict = {"payload": {"ok": True, "results": []}, "stdout": None, "argv": None}
-    monkeypatch.setattr(serp_module.deps, "require_cli", lambda name, version: "/bin/serp")
+    monkeypatch.setattr(serp_module.deps, "require_cli", lambda name, version, **kwargs: "/bin/serp")
 
     def fake_run(argv, **kwargs):
         state["argv"] = argv
@@ -481,7 +483,7 @@ def test_serp_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(DependencyTooOld) as exc_info:
         SerpProvider().search("q", limit=1)
     assert exc_info.value.code == "DEPENDENCY_TOO_OLD"
-    assert f'uv tool install "git+https://github.com/bolandeu/serp.git@v{serp_module.MIN_SERP}"' in (
+    assert f'uv tool install --reinstall "git+https://github.com/bolandeu/serp@v{serp_module.MIN_SERP}"' in (
         exc_info.value.action or ""
     )
     ok, detail = SerpProvider.check()
@@ -541,39 +543,60 @@ def test_human_output_shows_serp_engine(tmp_path: Path, fake_serp: dict) -> None
 # --- health_check (context auth status --check) -------------------------------
 
 
-class _FakeExaRequest:
-    def __init__(self, error: Exception | None) -> None:
-        self.error = error
-
-    def request(self, endpoint, data=None, **kwargs):
-        if self.error:
-            raise self.error
-        return {}
+class _FakeExaClient:
+    base_url = "https://api.exa.test"
+    headers: ClassVar[dict[str, str]] = {"x-api-key": "k"}
 
 
-@pytest.mark.parametrize(
-    ("error", "status"),
-    [
-        (ValueError('Request failed with status code 400: {"error":"Invalid request body | Validation"}'), "ok"),
-        (None, "ok"),
-        (ValueError("Request failed with status code 402: NO_MORE_CREDITS"), "quota_exhausted"),
-    ],
-)
-def test_exa_health_check(error: Exception | None, status: str) -> None:
-    provider = ExaProvider(_FakeExaRequest(error))  # ty: ignore[invalid-argument-type]
-    assert provider.health_check().status == status
+def _exa_probe(monkeypatch: pytest.MonkeyPatch, status: int, text: str = "{}") -> ExaProvider:
+    def post(url, *, json, headers, timeout):
+        assert (url, json, headers, timeout) == (
+            "https://api.exa.test/search",
+            {"numResults": 1},
+            {"x-api-key": "k"},
+            10.0,
+        )
+        response = requests.Response()
+        response.status_code, response._content = status, text.encode()
+        return response
+
+    monkeypatch.setattr(exa_module.requests, "post", post)
+    return ExaProvider(_FakeExaClient())  # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize(
-    ("error", "raised"),
+    ("status", "text", "health"),
     [
-        (ValueError("Request failed with status code 401: Invalid API key"), AuthRequired),
-        (ValueError("Request failed with status code 400: something else"), ProviderError),
+        (400, '{"error":"Invalid request body | Validation"}', "ok"),
+        (200, "{}", "ok"),
+        (402, "NO_MORE_CREDITS", "quota_exhausted"),
     ],
 )
-def test_exa_health_check_failures(error: Exception, raised: type[Exception]) -> None:
+def test_exa_health_check(monkeypatch: pytest.MonkeyPatch, status: int, text: str, health: str) -> None:
+    assert _exa_probe(monkeypatch, status, text).health_check().status == health
+
+
+@pytest.mark.parametrize(
+    ("status", "text", "raised"),
+    [
+        (401, "Invalid API key", AuthRequired),
+        (400, "something else", ProviderError),
+    ],
+)
+def test_exa_health_check_failures(
+    monkeypatch: pytest.MonkeyPatch, status: int, text: str, raised: type[Exception]
+) -> None:
     with pytest.raises(raised):
-        ExaProvider(_FakeExaRequest(error)).health_check()  # ty: ignore[invalid-argument-type]
+        _exa_probe(monkeypatch, status, text).health_check()
+
+
+def test_exa_health_check_timeout_is_provider_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def post(url, **kwargs):
+        raise requests.ReadTimeout("slow")
+
+    monkeypatch.setattr(exa_module.requests, "post", post)
+    with pytest.raises(ProviderError, match="ReadTimeout"):
+        ExaProvider(_FakeExaClient()).health_check()  # ty: ignore[invalid-argument-type]
 
 
 def _tavily_usage(account: dict) -> TavilyProvider:
@@ -599,6 +622,11 @@ def test_tavily_health_check_exhausted_unless_paygo_left(monkeypatch: pytest.Mon
     paygo = {"plan_limit": 10, "plan_usage": 10, "paygo_limit": 5, "paygo_usage": 1}
     assert _tavily_usage(paygo).health_check().status == "ok"
     assert _tavily_usage({}).health_check() == Health()
+
+
+def test_brave_health_check_is_one_short_attempt() -> None:
+    provider = BraveProvider.for_health_check()
+    assert (provider.retries, provider.timeout) == (0, 10.0)
 
 
 def test_brave_health_check() -> None:

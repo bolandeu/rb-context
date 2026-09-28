@@ -11,12 +11,11 @@ from packaging.version import Version
 from ..providers import PROVIDERS, SearchProvider, provider_class
 from .errors import AllProvidersFailed, CliError, CliTooOld, InvalidArguments, ProjectNotInitialized
 from .models import DEFAULT_PROVIDERS, ProjectConfig, ProviderRun, SearchHit
-from .version import CLI_NAME, installed_version
+from .version import cli_name, installed_version
 
-# Derived at import time from this package's own name, so this module never
-# needs template substitution: it just works under whatever package_name
-# the project was generated with.
-PROJECT_DIR_NAME = f".{CLI_NAME}"
+# Папка проекта — по имени команды (.context), а не пакета (.rb_context, как в
+# шаблоне): так она называлась до переименования пакета в rb_context.
+PROJECT_DIR_NAME = f".{cli_name()}"
 CONFIG_FILE_NAME = "config.toml"
 
 

@@ -6,7 +6,7 @@ import re
 from ..core.errors import ProviderError, QuotaExceeded
 from ..core.models import SearchHit, extract_domain
 from .base import Health, SearchProvider
-from .http import HttpProvider
+from .http import PROBE_TIMEOUT, HttpProvider
 
 _TAG_RE = re.compile(r"<[^>]+>")
 # Brave отдаёт не больше 20 результатов на запрос.
@@ -31,6 +31,14 @@ class BraveProvider(HttpProvider, SearchProvider):
 
     def auth_headers(self) -> dict[str, str]:
         return {"X-Subscription-Token": self._api_key or self.require_api_key(), "Accept": "application/json"}
+
+    @classmethod
+    def for_health_check(cls, target: str | None = None) -> BraveProvider:
+        # Проверка идёт через обычный search(): одна попытка и таймаут проверки (стандарт §8).
+        provider = cls()
+        provider.target = target
+        provider.retries, provider.timeout = 0, PROBE_TIMEOUT
+        return provider
 
     def health_check(self) -> Health:
         """Поиск с `count=1`: бесплатного эндпоинта у Brave нет, это самый дешёвый запрос."""

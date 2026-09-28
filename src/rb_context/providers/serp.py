@@ -4,24 +4,19 @@ import json
 import subprocess
 
 from ..core import deps
-from ..core.errors import AuthRequired, CliError, DependencyTooOld, ProviderError
+from ..core.errors import AuthRequired, CliError, ProviderError
 from ..core.models import SearchHit
 from .base import Health, SearchProvider
 
 # 0.4.0 — `auth status --json` в форме §8 стандарта (ok + credentials[].status).
 MIN_SERP = "0.4.0"
-_REPO = "git+https://github.com/bolandeu/serp.git"
+_REPO = "https://github.com/bolandeu/serp"
 # serp сам повторяет сбойные страницы до 10 раз; дольше ждать нет смысла.
 _TIMEOUT = 300
 
 
 def _exe() -> str:
-    try:
-        return deps.require_cli("serp", MIN_SERP)
-    except DependencyTooOld as exc:
-        if "not installed" in exc.message:
-            exc.action = f"Run 'uv tool install \"{_REPO}@v{MIN_SERP}\"', then retry."
-        raise
+    return deps.require_cli("serp", MIN_SERP, install_url=_REPO)
 
 
 def _run_json(args: list[str]) -> dict:

@@ -44,7 +44,7 @@ class TavilyProvider(HttpProvider, SearchProvider):
 
     def health_check(self) -> Health:
         """`GET /usage` (не тарифицируется): кредиты тарифа и остаток pay-as-you-go."""
-        account = self.get_json("/usage").get("account") or {}
+        account = self.probe("/usage").json().get("account") or {}
         plan_limit, plan_usage = account.get("plan_limit"), account.get("plan_usage") or 0
         if plan_limit is None:
             return Health()

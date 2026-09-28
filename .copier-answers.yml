@@ -1,10 +1,15 @@
 # Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
-_commit: v1.2.0
+_commit: v1.2.8
 _src_path: gh:bolandeu/cli-generator
 author_name: bolandeu
+cli_name: context
 description: 'Веб-контекст для LLM через поисковых провайдеров (Exa, Brave, Tavily):
     CLI context и библиотека rb_context'
+dist_name: rb-context
+dist_name_legacy: ''
 include_auth: true
+include_ci: true
 package_name: rb_context
+private_deps: false
 project_name: context
 repository_url: https://github.com/bolandeu/context
