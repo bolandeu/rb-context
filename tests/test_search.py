@@ -483,7 +483,7 @@ def test_serp_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(DependencyTooOld) as exc_info:
         SerpProvider().search("q", limit=1)
     assert exc_info.value.code == "DEPENDENCY_TOO_OLD"
-    assert f'uv tool install --reinstall "git+https://github.com/bolandeu/serp@v{serp_module.MIN_SERP}"' in (
+    assert f'uv tool install "rb-serp @ git+https://github.com/bolandeu/serp.git@v{serp_module.MIN_SERP}" --force' in (
         exc_info.value.action or ""
     )
     ok, detail = SerpProvider.check()
@@ -496,7 +496,7 @@ def test_serp_too_old(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(DependencyTooOld) as exc_info:
         SerpProvider().search("q", limit=1)
     assert "is 0.3.0" in exc_info.value.message and serp_module.MIN_SERP in exc_info.value.message
-    assert "uv tool upgrade serp" in (exc_info.value.action or "")
+    assert f"serp.git@v{serp_module.MIN_SERP}" in (exc_info.value.action or "")
 
 
 def _serp_status(ok: bool, *statuses: str) -> dict:

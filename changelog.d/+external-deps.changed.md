@@ -1,0 +1,1 @@
+Шаблон cli-generator v1.2.10: внешний CLI serp объявлен в [[tool.rb.external]]; `context doctor` показывает проверку `external:serp`, подсказка установки serp — `uv tool install "rb-serp @ git+…@vX.Y.Z" --force`.

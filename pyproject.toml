@@ -44,6 +44,10 @@ cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rb_context"]
 
+[tool.hatch.build.targets.wheel.force-include]
+# The installed CLI reads [[tool.rb.external]] from here (core/deps.py).
+"pyproject.toml" = "rb_context/_pyproject.toml"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -92,6 +96,28 @@ showcontent = true
 directory = "security"
 name = "Security"
 showcontent = true
+
+# External (non-Python) dependencies — every CLI this tool runs (require_cli,
+# shutil.which, subprocess with a literal program, npx). The gate checks this
+# list against the code both ways; doctor and require_cli read it at runtime;
+# the tools/ root builds docs/external-deps.md from it (standard §12).
+# [[tool.rb.external]]
+# name = "ffmpeg"
+# required = true               # false: the tool works without it (doctor stays healthy)
+# min_version = "6.0"           # optional
+# check = "ffmpeg -version"     # prints the version; default "<name> --version"
+# why = "transcodes the downloaded videos"
+# detect = false                # run via an injected runner / absolute path the gate can't see
+# dist = "rb-serp"              # for one of our CLIs: its distribution (default rb-<name>)
+# url = "https://github.com/bolandeu/serp"  # its repo: DEPENDENCY_TOO_OLD then prints a pinned install
+
+[[tool.rb.external]]
+name = "serp"
+required = false
+min_version = "0.4.0"
+why = "провайдер serp: выдача Яндекса/Google со сниппетами (`serp snippets --json`)"
+dist = "rb-serp"
+url = "https://github.com/bolandeu/serp"
 
 [tool.cli-generator]
 # Where scripts/check_command_docstrings.py (git pre-commit + Claude Code hooks)

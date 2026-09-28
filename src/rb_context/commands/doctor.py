@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 
 from .. import output
-from ..core import services
+from ..core import deps, services
 from ..core.errors import CliTooOld, InvalidArguments
 from ..core.models import DEFAULT_PROVIDERS, ProjectConfig
 from ..core.version import DEV_VERSION, installed_version
@@ -38,7 +38,7 @@ def doctor(
     quiet: bool = output.QuietOption,
     verbose: bool = output.VerboseOption,
 ) -> None:
-    """Диагностика: версия, проект, настройки, связка ключей, ключи провайдеров.
+    """Диагностика: версия, проект, настройки, связка ключей, ключи провайдеров, внешние CLI (serp).
 
     Always exits 0 — the report itself is the result; `healthy` says
     whether every check passed.
@@ -68,6 +68,7 @@ def doctor(
             checks.append({"name": "cli_compat", "ok": False, "detail": exc.message})
 
     checks.extend(_auth_checks(config.providers if config else list(DEFAULT_PROVIDERS)))
+    checks.extend(deps.doctor_checks())  # [[tool.rb.external]] in pyproject.toml
 
     all_ok = all(check["ok"] for check in checks)
     output.emit_success(

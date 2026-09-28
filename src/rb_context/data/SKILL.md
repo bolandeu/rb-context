@@ -13,8 +13,10 @@ description: Веб-поиск как контекст для LLM через CLI
 ## Установка (если `context --version` не работает)
 
 ```bash
-uv tool install "git+https://github.com/bolandeu/context.git"
+uv tool install "rb-context @ git+https://github.com/bolandeu/context.git@vX.Y.Z"
 ```
+
+Вместо `vX.Y.Z` — последний тег релиза (ставить из тега, не из ветки: стандарт §9).
 
 Одинаково на macOS, Linux и Windows; обновление — `uv tool upgrade rb-context`.
 Из исходников не запускать, если не просили разрабатывать сам CLI.
@@ -26,7 +28,7 @@ failed`, `could not read Username`, `Repository not found`) токен не
 SSH-ключами работает и так:
 
 ```bash
-uv tool install "git+ssh://git@github.com/bolandeu/context.git"
+uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y.Z"
 ```
 
 ## Правила
