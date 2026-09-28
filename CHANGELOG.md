@@ -10,6 +10,13 @@ one of added/changed/deprecated/removed/fixed/security), and
 
 <!-- towncrier release notes start -->
 
+## [0.2.1] - 2026-09-28
+
+### Changed
+
+- Шаблон cli-generator v1.2.8: `auth status --check` ограничивает проверку 10 с таймаутом запроса самого провайдера (exa, brave, tavily — одна попытка), без фонового потока; подсказка при отсутствующем или старом serp — готовая команда `uv tool install --reinstall` с тегом.
+
+
 ## [0.2.0] - 2026-09-27
 
 ### Changed
