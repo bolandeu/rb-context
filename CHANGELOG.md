@@ -10,6 +10,13 @@ one of added/changed/deprecated/removed/fixed/security), and
 
 <!-- towncrier release notes start -->
 
+## [0.2.2] - 2026-09-28
+
+### Changed
+
+- Шаблон cli-generator v1.2.10: внешний CLI serp объявлен в [[tool.rb.external]]; `context doctor` показывает проверку `external:serp`, подсказка установки serp — `uv tool install "rb-serp @ git+…@vX.Y.Z" --force`.
+
+
 ## [0.2.1] - 2026-09-28
 
 ### Changed
