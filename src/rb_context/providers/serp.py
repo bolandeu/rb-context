@@ -5,14 +5,40 @@ import subprocess
 
 from ..core import deps
 from ..core.errors import AuthRequired, CliError, ProviderError
-from ..core.models import SearchHit
+from ..core.models import COST_CURRENCY, CallCost, SearchHit
 from .base import Health, SearchProvider
 
-# 0.4.0 — `auth status --json` в форме §8 стандарта (ok + credentials[].status).
-MIN_SERP = "0.4.0"
+# 0.7.2 — стоимость в конверте --json (cost, cost_source, billable_requests и итоги, T175).
+MIN_SERP = "0.7.2"
 _REPO = "https://github.com/bolandeu/serp"
 # serp сам повторяет сбойные страницы до 10 раз; дольше ждать нет смысла.
 _TIMEOUT = 300
+
+
+# Если страницы разного происхождения — общий источник по худшему: неизвестно > цена > провайдер > кэш.
+_SOURCE_RANK = {"cache": 0, "provider": 1, "price_table": 2}
+
+
+def _envelope_cost(payload: dict) -> CallCost:
+    """Стоимость вызова serp из его конверта: `cost_total`, `billable_requests_total`, `sources[]`.
+
+    Конверт без `cost_total` (`serp snippets` 0.7.2 стоимость ещё не отдаёт) — cost
+    неизвестна (None), а платными считаются страницы не из кэша.
+    """
+    sources = payload.get("sources") or []
+    if "cost_total" not in payload:
+        return CallCost(
+            billable_requests=sum(1 for row in sources if not row.get("from_cache")), cost=None, cost_source=None
+        )
+    kinds = [row.get("cost_source") for row in sources]
+    cost_source = None if None in kinds or not kinds else max(kinds, key=lambda kind: _SOURCE_RANK.get(kind, 3))
+    currencies = {row.get("cost_currency") for row in sources} - {None}
+    return CallCost(
+        billable_requests=payload.get("billable_requests_total") or 0,
+        cost=payload["cost_total"],
+        cost_currency=currencies.pop() if len(currencies) == 1 else COST_CURRENCY,
+        cost_source=cost_source if payload["cost_total"] is not None else None,
+    )
 
 
 def _exe() -> str:
@@ -47,6 +73,8 @@ class SerpProvider(SearchProvider):
     multi_mode = True
     needs_api_key = False
     credential_fields = ()
+    # Платный: стоимость отдаёт serp; пока его ответа нет (упал, не установлен) — неизвестна.
+    last_cost = CallCost(cost=None, cost_source=None)
 
     @classmethod
     def check(cls) -> tuple[bool, str | None]:
@@ -76,6 +104,7 @@ class SerpProvider(SearchProvider):
                 exc.action = error.get("action") or "Run 'serp auth login'."
                 raise exc
             raise ProviderError(self.name, error.get("message", "неизвестная ошибка"), action=error.get("action"))
+        self.last_cost = _envelope_cost(payload)
         return [
             SearchHit(
                 provider=self.name,

@@ -45,7 +45,7 @@ uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y
 - **Проект необязателен.** Свой набор по умолчанию — `context init
   --non-interactive`, затем `context config set providers exa,serp`.
 - **serp — отдельный CLI.** `rb-serp` не зависимость context: провайдер `serp`
-  вызывает установленную команду `serp` не старше 0.4.0. Нет или старая —
+  вызывает установленную команду `serp` не старше 0.7.2. Нет или старая —
   ошибка `DEPENDENCY_TOO_OLD` с командой установки/обновления в `action`; ключи serp — `serp auth login`, не `context auth login`.
 - **`--non-interactive`** на всём, что может спросить: вместо зависания —
   структурированная ошибка.
@@ -56,9 +56,12 @@ uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y
   (откуда каждый ключ и работает ли, без значений; exit 3 — не в порядке exa
   или неверен любой; tavily и brave необязательны) или `context doctor --json`;
   никогда не проси пользователя вставить ключ в командную строку.
-- **Стоимость.** Каждый запрос платный у каждого провайдера. Глубокие
-  режимы (`--exa-mode deep*`, `--tavily-mode advanced`) дороже и медленнее —
-  только когда обычный поиск не дал нужного.
+- **Стоимость.** Exa, Tavily, Brave — бесплатные месячные лимиты: каждый
+  запрос тратит лимит (`sources[].billable_requests`), cost 0
+  (`cost_source: "free_tier"`); serp платный (рубли, `cost_total`). Глубокие
+  режимы (`--exa-mode deep*`, `--tavily-mode advanced`) тратят больше — только
+  когда обычный поиск не дал нужного. `auth status --check` с brave тратит
+  1 запрос его лимита — не запускать по расписанию.
 
 ## Ошибки
 
@@ -72,13 +75,13 @@ uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y
     4  проект не инициализирован → context init
     5  сбой провайдера (все опрошенные не ответили):
          PROVIDER_ERROR  — сеть / сервис / частота запросов → повторить позже
-         QUOTA_EXCEEDED  — кончился баланс или лимит тарифа → НЕ повторять, сказать пользователю
+         QUOTA_EXHAUSTED — исчерпан бесплатный лимит → НЕ повторять, сказать пользователю
     6  CLI старее, чем требует проект → uv tool upgrade rb-context
 
 Если не ответил никто из нескольких провайдеров, в `error.errors` — ошибка
 каждого (`provider`, `code`, `message`). При частичном отказе (exit 0) те же
-ошибки — в `sources[].error`: `QUOTA_EXCEEDED` там значит, что этот провайдер
-«по нулям» и дальше будет отказывать, пока баланс не пополнят, — сообщи
+ошибки — в `sources[].error`: `QUOTA_EXHAUSTED` там значит, что лимит этого
+провайдера исчерпан и он будет отказывать до нового периода лимита — сообщи
 пользователю и не включай его в следующие запросы (`-p` без него).
 
 Автоматически повторять имеет смысл только `PROVIDER_ERROR` (exit 5).

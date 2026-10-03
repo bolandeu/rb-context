@@ -65,8 +65,18 @@ context search "news about uv" --json                     # для агенто�
 **Лимиты.** Каждый опрошенный провайдер тратит свой лимит, поэтому без `-p` опрашивается
 только один — `exa`, а все сразу — только явно, `-p all`. Свой набор по умолчанию для
 проекта: `context init`, затем `context config set providers exa,serp` (`all` — все).
-Упавший провайдер не мешает остальным: его ошибка в `sources[].error`; кончился баланс —
-`QUOTA_EXCEEDED`.
+Упавший провайдер не мешает остальным: его ошибка в `sources[].error`. Exa, Tavily и Brave —
+только бесплатные лимиты: исчерпан — `QUOTA_EXHAUSTED` («лимит исчерпан»), на платный тариф
+context не переходит.
+
+**Стоимость** (`--json`): у каждого вызова в `sources[]` — `billable_requests`, `cost`,
+`cost_currency` (RUB), `cost_source`, `would_cost`/`would_cost_unit`; в конверте `cost_total` и
+`billable_requests_total`. Exa/Tavily/Brave — `cost_source: "free_tier"`, cost 0; что вызов стоил
+бы по словам провайдера — `would_cost` (Exa `costDollars` в USD, Tavily — кредиты, Brave — null),
+в cost не входит. serp платный — его cost и `cost_source` берутся из конверта serp; не отдал
+(`serp snippets` пока без стоимости) — cost и `cost_total` null с предупреждением в stderr.
+Проверка ключа Brave (`auth status --check`) — поиск `count=1`, тратит 1 запрос лимита
+(бесплатной у Brave нет): не запускать по расписанию.
 
 Режимы: `--exa-mode` (auto, fast, instant, deep-lite, deep, deep-reasoning),
 `--tavily-mode` (basic, advanced, fast, ultra-fast), `--serp-engine` (yandex, google или оба —
@@ -85,7 +95,7 @@ context search "news about uv" --json                     # для агенто�
 контракт для агентов (конверт, коды ошибок), ключи XML River / XMLStock остаются в serp и
 не дублируются, версии двух пакетов не связаны. Импорт `rb-serp` потребовал бы зависимость
 от приватного git-репозитория в `uv.lock` (CI её не скачает) и синхронных релизов.
-Цена — serp должен быть установлен отдельно, не старше 0.4.0 (`MIN_SERP` в
+Цена — serp должен быть установлен отдельно, не старше 0.7.2 (`MIN_SERP` в
 `providers/serp.py`, проверяется по `serp --version`):
 `uv tool install "git+https://github.com/bolandeu/serp.git"`; без него или со старым провайдер
 `serp` отвечает `DEPENDENCY_TOO_OLD` с командой установки/обновления в `action`, остальные работают.

@@ -7,7 +7,7 @@ from tavily import TavilyClient
 from tavily.errors import ForbiddenError, InvalidAPIKeyError, MissingAPIKeyError
 
 from ..core.errors import AuthRequired, ProviderError, QuotaExceeded
-from ..core.models import SearchHit, extract_domain
+from ..core.models import CallCost, SearchHit, extract_domain
 from .base import Health, Quota, SearchProvider
 from .http import HttpProvider
 
@@ -63,7 +63,12 @@ class TavilyProvider(HttpProvider, SearchProvider):
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
         client = self._client  # нет ключа — AuthRequired здесь, а не в общем except ниже
         try:
-            response = client.search(query, max_results=limit, search_depth=mode)  # ty: ignore[invalid-argument-type]
+            response = client.search(
+                query,
+                max_results=limit,
+                search_depth=mode,  # ty: ignore[invalid-argument-type]
+                include_usage=True,
+            )
         except ForbiddenError as exc:
             # 432 — лимит тарифа, 433 — лимит pay-as-you-go (docs.tavily.com, /search).
             if self._last_status in _QUOTA_STATUSES:
@@ -79,6 +84,11 @@ class TavilyProvider(HttpProvider, SearchProvider):
         except (requests.RequestException, Exception) as exc:
             # UsageLimitExceededError, BadRequestError, TimeoutError SDK и сетевые сбои.
             raise ProviderError(self.name, f"{type(exc).__name__}: {exc}"[:300]) from exc
+        # Только бесплатный лимит: cost 0, а кредиты из `usage` — «сколько стоило бы».
+        credits = (response.get("usage") or {}).get("credits")
+        self.last_cost = CallCost(
+            billable_requests=1, would_cost=credits, would_cost_unit="credits" if credits is not None else None
+        )
         return [
             SearchHit(
                 provider=self.name,

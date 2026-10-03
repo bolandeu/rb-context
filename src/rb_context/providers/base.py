@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import ClassVar, Literal
 
 from ..core.errors import AuthRequired
-from ..core.models import SearchHit
+from ..core.models import CallCost, SearchHit
 from ..core.version import cli_name, module_exists
 from ..credentials import manager as credentials
 
@@ -154,6 +154,12 @@ class SearchProvider(Provider, ABC):
     multi_mode: ClassVar[bool] = False
     # False — ключи хранит не context (serp держит их сам), `auth login` к нему не относится.
     needs_api_key: ClassVar[bool] = True
+    # True — бесплатной проверки нет, `health_check()` тратит запрос лимита (brave): doctor
+    # об этом предупреждает, а `auth status --check` не запускать по расписанию.
+    health_check_spends_quota: ClassVar[bool] = False
+    # Стоимость последнего `search()`; пока вызов не прошёл — бесплатный лимит без запросов.
+    # Провайдер сам ставит её после ответа; упавший вызов в счёт не идёт.
+    last_cost: CallCost = CallCost()
 
     @classmethod
     def check(cls) -> tuple[bool, str | None]:

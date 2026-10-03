@@ -3,14 +3,22 @@ from __future__ import annotations
 import html
 import re
 
+import httpx
+
 from ..core.errors import ProviderError, QuotaExceeded
-from ..core.models import SearchHit, extract_domain
-from .base import Health, SearchProvider
+from ..core.models import CallCost, SearchHit, extract_domain
+from .base import Health, Quota, SearchProvider
 from .http import PROBE_TIMEOUT, HttpProvider
 
 _TAG_RE = re.compile(r"<[^>]+>")
 # Brave отдаёт не больше 20 результатов на запрос.
 MAX_COUNT = 20
+
+
+def _monthly(header: str | None) -> int | None:
+    """Месячное значение из `X-RateLimit-*`: «секунда, месяц», например `1, 2000`."""
+    parts = [part.strip() for part in (header or "").split(",")]
+    return int(parts[-1]) if parts[-1].isdigit() else None
 
 
 def _plain(text: str) -> str:
@@ -25,6 +33,7 @@ class BraveProvider(HttpProvider, SearchProvider):
     summary = "Brave — независимый веб-индекс, описание и доп. сниппеты"
     base_url = "https://api.search.brave.com/res/v1"
     required = False  # context работает и без Brave
+    health_check_spends_quota = True
 
     def __init__(self, api_key: str | None = None) -> None:
         self._api_key = api_key  # None — ключ читается при первом запросе
@@ -41,21 +50,40 @@ class BraveProvider(HttpProvider, SearchProvider):
         return provider
 
     def health_check(self) -> Health:
-        """Поиск с `count=1`: бесплатного эндпоинта у Brave нет, это самый дешёвый запрос."""
+        """Поиск с `count=1` — тратит 1 запрос бесплатного лимита: бесплатного эндпоинта у Brave нет.
+
+        Остаток месячного лимита — из заголовков `X-RateLimit-*` этого ответа.
+        Поэтому `auth status --check` с brave не запускают по расписанию.
+        """
         try:
-            self.search("test", limit=1)
+            response = self._search_response("test", 1)
         except QuotaExceeded as exc:
             return Health(status="quota_exhausted", message=exc.message)
-        return Health()
+        remaining = _monthly(response.headers.get("X-RateLimit-Remaining"))
+        limit = _monthly(response.headers.get("X-RateLimit-Limit"))
+        return Health(
+            quota=Quota(remaining=remaining, limit=limit) if remaining is not None or limit is not None else None,
+            message="проверка — поиск count=1: тратит 1 запрос бесплатного лимита Brave",
+        )
 
-    def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
+    def _search_response(self, query: str, count: int) -> httpx.Response:
         try:
-            data = self.get_json("/web/search", q=query, count=min(limit, MAX_COUNT), extra_snippets="true")
+            return self.request("GET", "/web/search", params={"q": query, "count": count, "extra_snippets": "true"})
         except ProviderError as exc:
             # Исчерпан месячный лимит: 429 с кодом QUOTA_LIMITED в теле (просто частота — RATE_LIMITED) или 402.
             if exc.status == 402 or "QUOTA_LIMITED" in exc.message:
                 raise QuotaExceeded(self.name, f"HTTP {exc.status} QUOTA_LIMITED", status=exc.status) from exc
             raise
+
+    def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
+        response = self._search_response(query, min(limit, MAX_COUNT))
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise ProviderError(
+                self.name, "non-JSON response for GET /web/search", status=response.status_code
+            ) from exc
+        self.last_cost = CallCost(billable_requests=1)  # только бесплатный лимит; цену Brave не сообщает
         results = (data.get("web") or {}).get("results") or []
         return [
             SearchHit(

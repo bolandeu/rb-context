@@ -24,7 +24,11 @@ def _auth_checks(providers: list[str]) -> list[dict]:
     ]
     for provider in providers:
         try:
-            ok, detail = provider_class(provider).check()
+            cls = provider_class(provider)
+            ok, detail = cls.check()
+            if cls.health_check_spends_quota:
+                note = f"'auth status --check' тратит 1 запрос бесплатного лимита {provider} — не по расписанию"
+                detail = f"{detail}; {note}" if detail else note
         except InvalidArguments as exc:
             ok, detail = False, exc.message
         checks.append({"name": f"credential:{provider}", "ok": ok, "detail": detail})

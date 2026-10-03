@@ -60,16 +60,29 @@ def search(
     и пометка provider (у serp ещё engine — yandex/google). Упавший
     провайдер не мешает остальным — его ошибка в `sources[].error` (человеку —
     предупреждение в stderr). Не ответил никто — exit 5 (PROVIDER_ERROR,
-    QUOTA_EXCEEDED) или 3 (AUTH_REQUIRED).
+    QUOTA_EXHAUSTED — исчерпан бесплатный лимит, платный тариф не подключается)
+    или 3 (AUTH_REQUIRED).
 
     snippet — текст-контекст провайдера: exa — хайлайты страницы, tavily —
     выжимка content, brave — описание и доп. сниппеты, serp — сниппет из
-    выдачи Яндекса/Google (нужен установленный CLI serp ≥ 0.4.0 со своими
+    выдачи Яндекса/Google (нужен установленный CLI serp ≥ 0.7.2 со своими
     ключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`).
 
     --json: {"ok": true, "count": N, "results": [{provider, engine, query,
     position, url, domain, title, snippet, published, score}, ...], "sources":
-    [{provider, query, ok, count, error}, ...]}. Без --json — markdown в stdout.
+    [{provider, query, ok, count, error, billable_requests, cost,
+    cost_currency, cost_source, would_cost, would_cost_unit}, ...],
+    "billable_requests_total": N, "cost_total": X}. Без --json — markdown в stdout.
+
+    Стоимость — на каждый вызов провайдера (sources[]). exa, tavily, brave —
+    только бесплатные лимиты: cost 0, cost_source "free_tier", billable_requests
+    — потраченные запросы лимита (упавший вызов — 0); would_cost — сколько вызов
+    стоил бы по словам провайдера (exa — USD из costDollars, tavily — credits,
+    brave — null), в cost не входит. serp — платный: cost, cost_source
+    ("price_table", "provider", "cache" — 0) и billable_requests из конверта
+    serp. cost — в cost_currency "RUB"; cost_total — сумма cost всех вызовов,
+    null, если стоимость хоть одного неизвестна (serp упал или не отдал
+    стоимость — предупреждение в stderr) или не в рублях.
 
     \b
     Example: {cli} search "rag chunking strategies"            # только exa
@@ -85,12 +98,17 @@ def search(
     requested = {"exa": exa_mode, "tavily": tavily_mode, "serp": serp_engine}
     modes = {name: mode for name, mode in requested.items() if name in providers}
     hits, runs = services.search(queries, providers=providers, limit=limit, modes=modes)
+    cost_total, billable_total = services.cost_totals(runs)
+    for name in dict.fromkeys(run.provider for run in runs if run.cost is None):
+        typer.echo(f"Предупреждение: стоимость вызова {name} неизвестна — cost и cost_total null.", err=True)
     output.emit_success(
         ctx,
         {
             "count": len(hits),
             "results": [hit.model_dump() for hit in hits],
             "sources": [run.model_dump() for run in runs],
+            "billable_requests_total": billable_total,
+            "cost_total": cost_total,
         },
         render_human=lambda _: _render(hits, runs),
     )

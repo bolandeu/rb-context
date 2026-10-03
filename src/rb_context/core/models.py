@@ -25,8 +25,30 @@ class SearchHit(BaseModel):
     score: float | None = None
 
 
-class ProviderRun(BaseModel):
-    """Итог одного провайдера по одному запросу: сколько нашёл или почему упал."""
+# Валюта стоимости платных вызовов (serp — рубли); бесплатные лимиты — 0 в той же валюте.
+COST_CURRENCY = "RUB"
+
+
+class CallCost(BaseModel):
+    """Стоимость одного вызова провайдера (общая схема T175, как у serp и wordstat).
+
+    billable_requests — сколько запросов ушло в счёт тарифа или бесплатного лимита.
+    cost_source: "free_tier" — бесплатный лимит (cost 0, платный тариф не подключён),
+    "price_table" / "provider" / "cache" — как их отдал serp, None — стоимость неизвестна
+    (cost None). would_cost — сколько вызов стоил бы по словам самого провайдера, в
+    would_cost_unit (exa — "USD", tavily — "credits"); в cost не входит.
+    """
+
+    billable_requests: int = 0
+    cost: float | None = 0.0
+    cost_currency: str = COST_CURRENCY
+    cost_source: str | None = "free_tier"
+    would_cost: float | None = None
+    would_cost_unit: str | None = None
+
+
+class ProviderRun(CallCost):
+    """Итог одного провайдера по одному запросу: сколько нашёл или почему упал и во что обошёлся."""
 
     provider: str
     query: str

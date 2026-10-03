@@ -143,16 +143,19 @@ class ProviderError(CliError):
 
 
 class QuotaExceeded(ProviderError):
-    """Кончился баланс или лимит тарифа провайдера: повтор не поможет, нужен человек."""
+    """Исчерпан бесплатный лимит провайдера: платный тариф не подключается, повтор не поможет."""
 
     def __init__(self, provider: str, detail: str, *, status: int | None = None) -> None:
         super().__init__(
             provider,
-            f"закончился баланс или лимит тарифа ({detail})",
+            f"лимит исчерпан ({detail})",
             status=status,
-            action=f"Пополнить баланс или поднять лимит в кабинете {provider}; повтор не поможет.",
+            action=(
+                f"Исчерпан бесплатный лимит {provider}, платный тариф не подключён: дождаться нового "
+                "периода лимита или взять другого провайдера (-p); повтор не поможет."
+            ),
         )
-        self.code = "QUOTA_EXCEEDED"
+        self.code = "QUOTA_EXHAUSTED"
 
 
 class AllProvidersFailed(ProviderError):

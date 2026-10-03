@@ -10,7 +10,7 @@ from packaging.version import Version
 
 from ..providers import PROVIDERS, SearchProvider, provider_class
 from .errors import AllProvidersFailed, CliError, CliTooOld, InvalidArguments, ProjectNotInitialized
-from .models import DEFAULT_PROVIDERS, ProjectConfig, ProviderRun, SearchHit
+from .models import COST_CURRENCY, DEFAULT_PROVIDERS, ProjectConfig, ProviderRun, SearchHit
 from .version import cli_name, installed_version
 
 # Папка проекта — по имени команды (.context), а не пакета (.rb_context, как в
@@ -109,6 +109,21 @@ def _default_factory(name: str) -> SearchProvider:
     return provider_class(name)()
 
 
+def cost_totals(runs: list[ProviderRun]) -> tuple[float | None, int]:
+    """`cost_total` (в `COST_CURRENCY`) и `billable_requests_total` по всем вызовам.
+
+    Стоимость неизвестна хоть у одного вызова — итог None. Курсов context не знает:
+    ненулевая сумма в другой валюте тоже делает итог None (нули — не мешают).
+    """
+    billable = sum(run.billable_requests for run in runs)
+    total = 0.0
+    for run in runs:
+        if run.cost is None or (run.cost and run.cost_currency != COST_CURRENCY):
+            return None, billable
+        total += run.cost
+    return round(total, 6), billable
+
+
 def search(
     queries: list[str],
     *,
@@ -130,11 +145,15 @@ def search(
 
     def run(task: tuple[str, str]) -> tuple[list[SearchHit], ProviderRun, CliError | None]:
         query, name = task
+        provider: SearchProvider | None = None
         try:
-            hits = factory(name).search(query, limit=limit, mode=modes.get(name))
+            provider = factory(name)
+            hits = provider.search(query, limit=limit, mode=modes.get(name))
         except CliError as exc:
-            return [], ProviderRun(provider=name, query=query, ok=False, error=exc.to_dict()), exc
-        return hits, ProviderRun(provider=name, query=query, ok=True, count=len(hits)), None
+            cost = (provider or provider_class(name)).last_cost.model_dump()
+            return [], ProviderRun(provider=name, query=query, ok=False, error=exc.to_dict(), **cost), exc
+        cost = provider.last_cost.model_dump()
+        return hits, ProviderRun(provider=name, query=query, ok=True, count=len(hits), **cost), None
 
     hits: list[SearchHit] = []
     runs: list[ProviderRun] = []

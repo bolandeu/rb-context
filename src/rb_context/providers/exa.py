@@ -9,7 +9,7 @@ import requests
 from exa_py import Exa
 
 from ..core.errors import AuthRequired, ProviderError, QuotaExceeded
-from ..core.models import SearchHit, extract_domain
+from ..core.models import CallCost, SearchHit, extract_domain
 from .base import Health, SearchProvider
 from .http import PROBE_TIMEOUT
 
@@ -85,6 +85,12 @@ class ExaProvider(SearchProvider):
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
         with self._errors():
             response = self._client.search(query, num_results=limit, type=mode, contents={"highlights": True})
+        # Только бесплатный лимит: cost 0, а costDollars из ответа — «сколько стоило бы».
+        cost_dollars = getattr(response, "cost_dollars", None)
+        would_cost = getattr(cost_dollars, "total", None)
+        self.last_cost = CallCost(
+            billable_requests=1, would_cost=would_cost, would_cost_unit="USD" if would_cost is not None else None
+        )
         return [
             SearchHit(
                 provider=self.name,
