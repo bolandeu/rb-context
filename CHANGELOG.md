@@ -10,6 +10,13 @@ one of added/changed/deprecated/removed/fixed/security), and
 
 <!-- towncrier release notes start -->
 
+## [0.3.0] - 2026-10-03
+
+### Changed
+
+- search --json: у каждого вызова провайдера в sources[] — billable_requests, cost, cost_currency (RUB), cost_source, would_cost, would_cost_unit; в конверте cost_total и billable_requests_total (T175). Exa, Tavily, Brave — только бесплатные лимиты: cost 0, cost_source "free_tier", стоимость по словам провайдера — в would_cost; serp — cost из его конверта, нужен serp ≥ 0.7.2. Исчерпанный лимит — QUOTA_EXHAUSTED «лимит исчерпан» вместо QUOTA_EXCEEDED (ломающее: код ошибки). Проверка Brave в auth status --check показывает остаток месячного лимита и помечена как тратящая 1 запрос, doctor об этом предупреждает.
+
+
 ## [0.2.2] - 2026-09-28
 
 ### Changed
