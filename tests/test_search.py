@@ -91,7 +91,7 @@ def test_tavily_maps_content_to_snippet_and_passes_mode() -> None:
         {"results": [{"url": "https://t.dev/x", "title": "T", "content": "ctx", "score": 0.5, "published_date": None}]}
     )
     hits = TavilyProvider(client).search("q", limit=3, mode="advanced")  # ty: ignore[invalid-argument-type]
-    assert client.kwargs == {"max_results": 3, "search_depth": "advanced"}
+    assert client.kwargs == {"max_results": 3, "search_depth": "advanced", "include_usage": True}
     assert hits == [
         SearchHit(
             provider="tavily",
@@ -330,7 +330,7 @@ def test_exa_402_names_the_quota_tag() -> None:
     error = ValueError('Request failed with status code 402: {"tag":"TEAM_BUDGET_EXCEEDED"}')
     with pytest.raises(QuotaExceeded) as exc_info:
         ExaProvider(_FakeExa(error=error)).search("q", limit=1)  # ty: ignore[invalid-argument-type]
-    assert exc_info.value.code == "QUOTA_EXCEEDED"
+    assert exc_info.value.code == "QUOTA_EXHAUSTED"
     assert "TEAM_BUDGET_EXCEEDED" in exc_info.value.message
     assert "повтор не поможет" in (exc_info.value.action or "")
 
@@ -364,7 +364,7 @@ def test_tavily_real_client_gets_status_hook(monkeypatch: pytest.MonkeyPatch) ->
 def test_brave_quota_vs_rate_limit(status: int, body: dict, expected: type[Exception]) -> None:
     with pytest.raises(expected) as exc_info:
         _brave(lambda request: httpx.Response(status, json=body)).search("q", limit=1)
-    assert (getattr(exc_info.value, "code", None) == "QUOTA_EXCEEDED") is (expected is QuotaExceeded)
+    assert (getattr(exc_info.value, "code", None) == "QUOTA_EXHAUSTED") is (expected is QuotaExceeded)
 
 
 def test_all_failed_envelope_lists_each_provider_error(tmp_path: Path, fake_providers: dict) -> None:
@@ -372,7 +372,7 @@ def test_all_failed_envelope_lists_each_provider_error(tmp_path: Path, fake_prov
     fake_providers["tavily"] = QuotaExceeded("tavily", "HTTP 432", status=432)
     code, payload = invoke_json("--project", str(tmp_path), "search", "q", "-p", "exa,tavily")
     assert code == 5
-    assert [e["code"] for e in payload["error"]["errors"]] == ["QUOTA_EXCEEDED", "QUOTA_EXCEEDED"]
+    assert [e["code"] for e in payload["error"]["errors"]] == ["QUOTA_EXHAUSTED", "QUOTA_EXHAUSTED"]
     assert {e["provider"] for e in payload["error"]["errors"]} == {"exa", "tavily"}
 
 
@@ -381,7 +381,7 @@ def test_partial_quota_is_visible_in_sources(tmp_path: Path, fake_providers: dic
     code, payload = invoke_json("--project", str(tmp_path), "search", "q", "-p", "exa,brave")
     assert code == 0
     [failed] = [src for src in payload["sources"] if not src["ok"]]
-    assert failed["error"]["code"] == "QUOTA_EXCEEDED"
+    assert failed["error"]["code"] == "QUOTA_EXHAUSTED"
 
 
 # --- serp (через установленный CLI) -----------------------------------------
