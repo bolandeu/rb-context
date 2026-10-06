@@ -10,6 +10,13 @@ one of added/changed/deprecated/removed/fixed/security), and
 
 <!-- towncrier release notes start -->
 
+## [0.3.1] - 2026-10-06
+
+### Added
+
+- Бесплатные источники в `search`: `hackernews` (Hacker News), `github` (репозитории, issues, код; токен необязателен — `CONTEXT_GITHUB_API_KEY` или `GITHUB_TOKEN`) и `wikipedia` (ru, en); флаги `--github-mode` и `--wikipedia-lang`.
+
+
 ## [0.3.0] - 2026-10-03
 
 ### Changed

@@ -1,1 +1,0 @@
-Бесплатные источники в `search`: `hackernews` (Hacker News), `github` (репозитории, issues, код; токен необязателен — `CONTEXT_GITHUB_API_KEY` или `GITHUB_TOKEN`) и `wikipedia` (ru, en); флаги `--github-mode` и `--wikipedia-lang`.
