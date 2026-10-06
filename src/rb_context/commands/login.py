@@ -11,14 +11,16 @@ import typer
 from .. import output
 from ..core.errors import InvalidArguments
 from ..credentials import manager as credentials
-from ..providers import provider_class, providers_help
+from ..providers import SerpProvider, provider_class, providers_help
 
 ProviderOption = typer.Option(..., "--provider", "-p", help=f"Провайдер. Доступны: {providers_help()}.")
 
 
 def _require_api_key_provider(provider: str) -> None:
     if not provider_class(provider).needs_api_key:
-        raise InvalidArguments(f"Ключи {provider} хранит сам {provider}: '{provider} auth login'.")
+        if provider == SerpProvider.name:
+            raise InvalidArguments(f"Ключи {provider} хранит сам {provider}: '{provider} auth login'.")
+        raise InvalidArguments(f"Провайдеру {provider} ключ не нужен.")
 
 
 @output.guard
@@ -33,7 +35,8 @@ def login(
 
     Ключ берётся из CONTEXT_<PROVIDER>_API_KEY (например CONTEXT_EXA_API_KEY),
     если переменная задана, иначе спрашивается. С --non-interactive и без
-    переменной — ошибка, а не вопрос.
+    переменной — ошибка, а не вопрос. Провайдерам без ключа (hackernews,
+    wikipedia) и serp (ключи хранит сам serp) — INVALID_ARGUMENTS.
 
     Example: {cli} auth login --provider exa
     """

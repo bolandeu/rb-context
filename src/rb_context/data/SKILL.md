@@ -39,6 +39,8 @@ uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y
   один — `exa` (или `providers` из конфига проекта). Нужен другой — `-p tavily`,
   несколько — `-p exa,serp`, все — `-p all`, только если задаче правда нужны все.
   Выдача Яндекса/Google — `-p serp` (Яндекс; Google — `--serp-engine google`, оба — `yandex,google`).
+  Бесплатно и без ключа: `-p hackernews` (обсуждения), `-p wikipedia` (определения;
+  `--wikipedia-lang en`), `-p github` (репозитории; `--github-mode issues|code`, code — только с токеном).
 - **Выбранные опрашиваются параллельно.** Упавший провайдер не ломает
   ответ: `ok: true`, а его ошибка — в `sources[].error`. Проверяй `sources`,
   если результатов меньше, чем ждал.

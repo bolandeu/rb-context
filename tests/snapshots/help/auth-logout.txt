@@ -9,7 +9,10 @@
 │ *  --provider  -p      <str>  Провайдер. Доступны: exa (Exa — нейропоиск, хайлайты страниц);     │
 │                               tavily (Tavily — поиск с выжимкой контента под LLM); brave (Brave  │
 │                               — независимый веб-индекс, описание и доп. сниппеты); serp          │
-│                               (Яндекс/Google — выдача и сниппеты через CLI serp).                │
+│                               (Яндекс/Google — выдача и сниппеты через CLI serp); hackernews     │
+│                               (Hacker News — обсуждения и ссылки про технологии, без ключа);     │
+│                               github (GitHub — репозитории, issues и код, токен необязателен);   │
+│                               wikipedia (Википедия — определения и факты (ru, en), без ключа).   │
 │                               [required]                                                         │
 │    --json                     Emit machine-readable JSON output.                                 │
 │    --quiet                    Suppress non-essential output.                                     │

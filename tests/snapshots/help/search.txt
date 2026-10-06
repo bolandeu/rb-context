@@ -16,7 +16,14 @@
  snippet — текст-контекст провайдера: exa — хайлайты страницы, tavily —
  выжимка content, brave — описание и доп. сниппеты, serp — сниппет из
  выдачи Яндекса/Google (нужен установленный CLI serp ≥ 0.7.2 со своими
- ключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`).
+ ключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`),
+ hackernews — очки, комментарии, текст и ссылка на обсуждение, github —
+ описание и звёзды репозитория / текст issue / фрагменты кода, wikipedia —
+ вводный абзац статьи.
+
+ Без ключа: hackernews, wikipedia; github — токен необязателен
+ (CONTEXT_GITHUB_API_KEY, связка ключей или GITHUB_TOKEN), без него лимит
+ 10 поисков в минуту и нет --github-mode code (AUTH_REQUIRED).
 
  --json: {"ok": true, "count": N, "results": [{provider, engine, query,
  position, url, domain, title, snippet, published, score}, ...], "sources":
@@ -28,7 +35,9 @@
  только бесплатные лимиты: cost 0, cost_source "free_tier", billable_requests
  — потраченные запросы лимита (упавший вызов — 0); would_cost — сколько вызов
  стоил бы по словам провайдера (exa — USD из costDollars, tavily — credits,
- brave — null), в cost не входит. serp — платный: cost, cost_source
+ brave — null), в cost не входит. hackernews, wikipedia — бесплатно и без
+ лимита: cost 0, billable_requests 0; github — cost 0, billable_requests 1
+ (минутный лимит API; кончился — QUOTA_EXHAUSTED). serp — платный: cost, cost_source
  ("price_table", "provider", "cache" — 0) и billable_requests из конверта
  serp. cost — в cost_currency "RUB"; cost_total — сумма cost всех вызовов,
  null, если стоимость хоть одного неизвестна (serp упал или не отдал
@@ -41,33 +50,46 @@
           context search "запрос" -p all                      # все
           context search "купить диван" -p serp --serp-engine google
           context search "купить диван" -p serp --serp-engine yandex,google
+          context search "sqlite wal" -p hackernews,github,wikipedia --wikipedia-lang en
+          context search "typer callback" -p github --github-mode issues
           context search "сравнение векторных БД" -p exa --exa-mode deep
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────╮
 │ *    queries      <str>  Один или несколько поисковых запросов. [required]                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --provider     -p      <str>                    Кого опросить: один (-p exa), несколько через    │
-│                                                 запятую (-p exa,serp) или все (-p all);          │
-│                                                 выбранные опрашиваются параллельно, и каждый     │
-│                                                 тратит свой лимит. Доступны: exa (Exa —          │
-│                                                 нейропоиск, хайлайты страниц); tavily (Tavily —  │
-│                                                 поиск с выжимкой контента под LLM); brave (Brave │
-│                                                 — независимый веб-индекс, описание и доп.        │
-│                                                 сниппеты); serp (Яндекс/Google — выдача и        │
-│                                                 сниппеты через CLI serp). По умолчанию —         │
-│                                                 `providers` из конфига проекта, иначе exa.       │
-│ --limit        -n      <int range> [1<=x<=100]  Результатов с каждого провайдера (brave ≤ 20).   │
-│                                                 [default: 10]                                    │
-│ --exa-mode             <str>                    Режим Exa: auto, fast, instant, deep-lite, deep, │
-│                                                 deep-reasoning. По умолчанию auto.               │
-│ --tavily-mode          <str>                    Режим Tavily: basic, advanced, fast, ultra-fast. │
-│                                                 По умолчанию basic.                              │
-│ --serp-engine          <str>                    Поисковик для serp: yandex, google или оба через │
-│                                                 запятую. По умолчанию yandex.                    │
-│ --json                                          Emit machine-readable JSON output.               │
-│ --quiet                                         Suppress non-essential output.                   │
-│ --verbose                                       Emit extra diagnostic output.                    │
-│ --help                                          Show this message and exit.                      │
+│ --provider        -p      <str>                    Кого опросить: один (-p exa), несколько через │
+│                                                    запятую (-p exa,serp) или все (-p all);       │
+│                                                    выбранные опрашиваются параллельно, и каждый  │
+│                                                    тратит свой лимит. Доступны: exa (Exa —       │
+│                                                    нейропоиск, хайлайты страниц); tavily (Tavily │
+│                                                    — поиск с выжимкой контента под LLM); brave   │
+│                                                    (Brave — независимый веб-индекс, описание и   │
+│                                                    доп. сниппеты); serp (Яндекс/Google — выдача  │
+│                                                    и сниппеты через CLI serp); hackernews        │
+│                                                    (Hacker News — обсуждения и ссылки про        │
+│                                                    технологии, без ключа); github (GitHub —      │
+│                                                    репозитории, issues и код, токен              │
+│                                                    необязателен); wikipedia (Википедия —         │
+│                                                    определения и факты (ru, en), без ключа). По  │
+│                                                    умолчанию — `providers` из конфига проекта,   │
+│                                                    иначе exa.                                    │
+│ --limit           -n      <int range> [1<=x<=100]  Результатов с каждого провайдера (brave,      │
+│                                                    wikipedia ≤ 20).                              │
+│                                                    [default: 10]                                 │
+│ --exa-mode                <str>                    Режим Exa: auto, fast, instant, deep-lite,    │
+│                                                    deep, deep-reasoning. По умолчанию auto.      │
+│ --tavily-mode             <str>                    Режим Tavily: basic, advanced, fast,          │
+│                                                    ultra-fast. По умолчанию basic.               │
+│ --serp-engine             <str>                    Поисковик для serp: yandex, google или оба    │
+│                                                    через запятую. По умолчанию yandex.           │
+│ --github-mode             <str>                    Что искать на GitHub: repositories, issues,   │
+│                                                    code (code — только с токеном). По умолчанию  │
+│                                                    repositories.                                 │
+│ --wikipedia-lang          <str>                    Раздел Википедии: ru, en. По умолчанию ru.    │
+│ --json                                             Emit machine-readable JSON output.            │
+│ --quiet                                            Suppress non-essential output.                │
+│ --verbose                                          Emit extra diagnostic output.                 │
+│ --help                                             Show this message and exit.                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

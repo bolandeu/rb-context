@@ -1,8 +1,9 @@
 # context
 
 Веб-поиск как контекст для LLM через провайдеров [Exa](https://exa.ai),
-[Tavily](https://tavily.com), [Brave Search](https://brave.com/search/api/) и выдачу
-Яндекса/Google через CLI [`serp`](https://github.com/bolandeu/serp).
+[Tavily](https://tavily.com), [Brave Search](https://brave.com/search/api/), выдачу
+Яндекса/Google через CLI [`serp`](https://github.com/bolandeu/serp) и бесплатные источники без ключа:
+Hacker News, GitHub и Википедия.
 Выбранные провайдеры опрашиваются параллельно, результаты приходят в общем
 виде (URL, заголовок, сниппет-контекст) с пометкой, откуда каждый.
 Python-пакет — `rb-context` (импорт `rb_context`), команда в терминале — `context`.
@@ -60,6 +61,8 @@ context search "купить диван" -p serp --serp-engine google
 context search "купить диван" -p serp --serp-engine yandex,google  # оба
 context search "сравнение векторных БД" -p exa --exa-mode deep
 context search "news about uv" --json                     # для агентов
+context search "sqlite wal" -p hackernews,github,wikipedia --wikipedia-lang en  # бесплатные
+context search "typer callback" -p github --github-mode issues
 ```
 
 **Лимиты.** Каждый опрошенный провайдер тратит свой лимит, поэтому без `-p` опрашивается
@@ -80,7 +83,14 @@ context не переходит.
 
 Режимы: `--exa-mode` (auto, fast, instant, deep-lite, deep, deep-reasoning),
 `--tavily-mode` (basic, advanced, fast, ultra-fast), `--serp-engine` (yandex, google или оба —
-`yandex,google`; по умолчанию yandex). У Brave режимов нет.
+`yandex,google`; по умолчанию yandex), `--github-mode` (repositories, issues, code — code только
+с токеном), `--wikipedia-lang` (ru, en). У Brave и Hacker News режимов нет.
+
+**Бесплатные источники.** `hackernews` (API поиска Algolia) и `wikipedia` (MediaWiki API) —
+без ключа и без лимита: cost 0, `billable_requests` 0. `github` — REST search; токен
+необязателен (`context auth login -p github`, `CONTEXT_GITHUB_API_KEY` или `GITHUB_TOKEN`): без
+него 10 поисков в минуту вместо 30 и нет поиска по коду. Кончился минутный лимит —
+`QUOTA_EXHAUSTED`.
 
 ## Почему такие библиотеки
 
@@ -89,6 +99,7 @@ context не переходит.
 | Exa | официальный SDK [`exa-py`](https://github.com/exa-labs/exa-py) | поддерживается Exa, типы ответа; сниппет — `highlights` (рекомендация Exa для LLM-контекста) |
 | Tavily | официальный SDK [`tavily-python`](https://github.com/tavily-ai/tavily-python) | поддерживается Tavily, свои классы ошибок (ключ / лимит) |
 | Brave | REST через `providers/http.py` (`HttpProvider` на httpx) | официального Python SDK нет; сторонние обёртки ничего не дают поверх одного GET |
+| Hacker News, GitHub, Википедия | REST через `HttpProvider` | открытые API (Algolia, GitHub REST, MediaWiki); SDK ради одного GET не нужен |
 | serp (Яндекс/Google) | вызов установленного CLI `serp snippets --json` (subprocess) | **пакет `rb-serp` в зависимостях нет, и это намеренно** — см. ниже |
 
 **Почему serp — через CLI, а не библиотекой `rb-serp`.** `--json` у serp — его стабильный

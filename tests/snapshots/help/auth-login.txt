@@ -5,7 +5,8 @@
 
  Ключ берётся из CONTEXT_<PROVIDER>_API_KEY (например CONTEXT_EXA_API_KEY),
  если переменная задана, иначе спрашивается. С --non-interactive и без
- переменной — ошибка, а не вопрос.
+ переменной — ошибка, а не вопрос. Провайдерам без ключа (hackernews,
+ wikipedia) и serp (ключи хранит сам serp) — INVALID_ARGUMENTS.
 
  Example: context auth login --provider exa
 
@@ -14,7 +15,10 @@
 │                                      страниц); tavily (Tavily — поиск с выжимкой контента под    │
 │                                      LLM); brave (Brave — независимый веб-индекс, описание и     │
 │                                      доп. сниппеты); serp (Яндекс/Google — выдача и сниппеты     │
-│                                      через CLI serp).                                            │
+│                                      через CLI serp); hackernews (Hacker News — обсуждения и     │
+│                                      ссылки про технологии, без ключа); github (GitHub —         │
+│                                      репозитории, issues и код, токен необязателен); wikipedia   │
+│                                      (Википедия — определения и факты (ru, en), без ключа).      │
 │                                      [required]                                                  │
 │    --non-interactive                 Never prompt; fail instead.                                 │
 │    --json                            Emit machine-readable JSON output.                          │

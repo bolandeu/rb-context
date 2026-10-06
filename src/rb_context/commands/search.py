@@ -7,7 +7,14 @@ import typer
 from .. import output
 from ..core import services
 from ..core.models import ProviderRun, SearchHit
-from ..providers import ExaProvider, SerpProvider, TavilyProvider, providers_help
+from ..providers import (
+    ExaProvider,
+    GitHubProvider,
+    SerpProvider,
+    TavilyProvider,
+    WikipediaProvider,
+    providers_help,
+)
 
 
 def _render(hits: list[SearchHit], runs: list[ProviderRun]) -> None:
@@ -34,7 +41,7 @@ def search(
         f"Доступны: {providers_help()}. По умолчанию — `providers` из конфига проекта, иначе exa.",
     ),
     limit: int = typer.Option(
-        10, "--limit", "-n", min=1, max=100, help="Результатов с каждого провайдера (brave ≤ 20)."
+        10, "--limit", "-n", min=1, max=100, help="Результатов с каждого провайдера (brave, wikipedia ≤ 20)."
     ),
     exa_mode: str | None = typer.Option(
         None, "--exa-mode", help=f"Режим Exa: {', '.join(ExaProvider.modes)}. По умолчанию auto."
@@ -46,6 +53,15 @@ def search(
         None,
         "--serp-engine",
         help=f"Поисковик для serp: {', '.join(SerpProvider.modes)} или оба через запятую. По умолчанию yandex.",
+    ),
+    github_mode: str | None = typer.Option(
+        None,
+        "--github-mode",
+        help=f"Что искать на GitHub: {', '.join(GitHubProvider.modes)} (code — только с токеном). "
+        "По умолчанию repositories.",
+    ),
+    wikipedia_lang: str | None = typer.Option(
+        None, "--wikipedia-lang", help=f"Раздел Википедии: {', '.join(WikipediaProvider.modes)}. По умолчанию ru."
     ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
@@ -66,7 +82,14 @@ def search(
     snippet — текст-контекст провайдера: exa — хайлайты страницы, tavily —
     выжимка content, brave — описание и доп. сниппеты, serp — сниппет из
     выдачи Яндекса/Google (нужен установленный CLI serp ≥ 0.7.2 со своими
-    ключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`).
+    ключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`),
+    hackernews — очки, комментарии, текст и ссылка на обсуждение, github —
+    описание и звёзды репозитория / текст issue / фрагменты кода, wikipedia —
+    вводный абзац статьи.
+
+    Без ключа: hackernews, wikipedia; github — токен необязателен
+    (CONTEXT_GITHUB_API_KEY, связка ключей или GITHUB_TOKEN), без него лимит
+    10 поисков в минуту и нет --github-mode code (AUTH_REQUIRED).
 
     --json: {"ok": true, "count": N, "results": [{provider, engine, query,
     position, url, domain, title, snippet, published, score}, ...], "sources":
@@ -78,7 +101,9 @@ def search(
     только бесплатные лимиты: cost 0, cost_source "free_tier", billable_requests
     — потраченные запросы лимита (упавший вызов — 0); would_cost — сколько вызов
     стоил бы по словам провайдера (exa — USD из costDollars, tavily — credits,
-    brave — null), в cost не входит. serp — платный: cost, cost_source
+    brave — null), в cost не входит. hackernews, wikipedia — бесплатно и без
+    лимита: cost 0, billable_requests 0; github — cost 0, billable_requests 1
+    (минутный лимит API; кончился — QUOTA_EXHAUSTED). serp — платный: cost, cost_source
     ("price_table", "provider", "cache" — 0) и billable_requests из конверта
     serp. cost — в cost_currency "RUB"; cost_total — сумма cost всех вызовов,
     null, если стоимость хоть одного неизвестна (serp упал или не отдал
@@ -91,11 +116,19 @@ def search(
              {cli} search "запрос" -p all                      # все
              {cli} search "купить диван" -p serp --serp-engine google
              {cli} search "купить диван" -p serp --serp-engine yandex,google
+             {cli} search "sqlite wal" -p hackernews,github,wikipedia --wikipedia-lang en
+             {cli} search "typer callback" -p github --github-mode issues
              {cli} search "сравнение векторных БД" -p exa --exa-mode deep
     """
     providers = services.resolve_providers(provider, Path(ctx.obj.get("project") or Path.cwd()))
     output.vecho(ctx, f"Провайдеры: {', '.join(providers)}")
-    requested = {"exa": exa_mode, "tavily": tavily_mode, "serp": serp_engine}
+    requested = {
+        "exa": exa_mode,
+        "tavily": tavily_mode,
+        "serp": serp_engine,
+        "github": github_mode,
+        "wikipedia": wikipedia_lang,
+    }
     modes = {name: mode for name, mode in requested.items() if name in providers}
     hits, runs = services.search(queries, providers=providers, limit=limit, modes=modes)
     cost_total, billable_total = services.cost_totals(runs)

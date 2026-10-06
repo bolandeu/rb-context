@@ -356,13 +356,14 @@ def test_auth_login_logout_round_trip(fake_keyring) -> None:
 
 
 def test_real_providers_required_and_optional(fake_keyring) -> None:
-    """exa обязателен, tavily и brave — нет; serp держит ключи сам и в отчёт не входит."""
+    """exa обязателен, tavily, brave и github — нет; у serp, hackernews, wikipedia ключей в context нет."""
     code, payload, _ = status()
     # Другие тесты объявляют фальшивых провайдеров в rb_context.providers.* — смотрим только настоящих.
     entries = {name: entry for name, entry in by_provider(payload).items() if name in providers.PROVIDERS}
     assert {name: entry["required"] for name, entry in entries.items()} == {
         "brave": False,
         "exa": True,
+        "github": False,
         "tavily": False,
     }
     assert code == 3  # exa missing

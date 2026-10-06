@@ -4,7 +4,7 @@
 `PROVIDERS`. Дальше он доступен по имени в `context search --provider`,
 `context auth login --provider` и в `providers` конфига проекта. Сервис с
 официальным SDK оборачивается им (exa, tavily), без SDK — `HttpProvider`
-(brave), CLI — subprocess с его `--json` (serp); во всех случаях наружу
+(brave, hackernews, github, wikipedia), CLI — subprocess с его `--json` (serp); во всех случаях наружу
 только `ProviderError` / `AuthRequired`.
 
 Каждый провайдер реализует `health_check()` — это то, что проверяет
@@ -17,15 +17,21 @@ from ..core.errors import InvalidArguments
 from .base import Health, Provider, Quota, SearchProvider, all_providers
 from .brave import BraveProvider
 from .exa import ExaProvider
+from .github import GitHubProvider
+from .hackernews import HackerNewsProvider
 from .http import HttpProvider
 from .serp import SerpProvider
 from .tavily import TavilyProvider
+from .wikipedia import WikipediaProvider
 
 PROVIDERS: dict[str, type[SearchProvider]] = {
     ExaProvider.name: ExaProvider,
     TavilyProvider.name: TavilyProvider,
     BraveProvider.name: BraveProvider,
     SerpProvider.name: SerpProvider,
+    HackerNewsProvider.name: HackerNewsProvider,
+    GitHubProvider.name: GitHubProvider,
+    WikipediaProvider.name: WikipediaProvider,
 }
 
 
@@ -45,6 +51,8 @@ __all__ = [
     "PROVIDERS",
     "BraveProvider",
     "ExaProvider",
+    "GitHubProvider",
+    "HackerNewsProvider",
     "Health",
     "HttpProvider",
     "Provider",
@@ -52,6 +60,7 @@ __all__ = [
     "SearchProvider",
     "SerpProvider",
     "TavilyProvider",
+    "WikipediaProvider",
     "all_providers",
     "provider_class",
     "providers_help",

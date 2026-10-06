@@ -262,7 +262,15 @@ def test_resolve_providers_explicit_dedupes_and_validates(tmp_path: Path) -> Non
 
 
 def test_resolve_providers_all_means_every_provider(tmp_path: Path) -> None:
-    assert services.resolve_providers("all", tmp_path) == ["exa", "tavily", "brave", "serp"]
+    assert services.resolve_providers("all", tmp_path) == [
+        "exa",
+        "tavily",
+        "brave",
+        "serp",
+        "hackernews",
+        "github",
+        "wikipedia",
+    ]
 
 
 def test_resolve_providers_uses_project_config_then_default(tmp_path: Path) -> None:
