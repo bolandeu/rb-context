@@ -11,22 +11,17 @@ Python-пакет — `rb-context` (импорт `rb_context`), команда �
 ## Установка
 
 ```bash
-uv tool install "git+https://github.com/bolandeu/context.git"
+uv tool install rb-context --index https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple
 ```
 
-Одинаково на macOS, Linux и Windows; обновление — `uv tool upgrade rb-context`,
-конкретная версия — `...context.git@v0.2.0`.
-
-**Репозиторий приватный.** `uv` ходит в git так же, как `git clone`. Если установка
-падает с ошибкой авторизации — один раз `gh auth login` (или `gh auth setup-git`, если
-`gh` залогинен через `--with-token`), либо SSH-вариант:
-
-The version is the git tag (`vX.Y.Z`) — `pyproject.toml` has no `version =`.
-Each change adds a changelog fragment instead of editing `CHANGELOG.md`:
+Из git-тега:
 
 ```bash
-uv tool install "git+ssh://git@github.com/bolandeu/context.git"
+uv tool install "rb-context @ git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/context.git@vX.Y.Z"
 ```
+
+Вместо `vX.Y.Z` — последний тег релиза. Одинаково на macOS, Linux и Windows; обновление —
+`uv tool upgrade rb-context`.
 
 ## Ключи
 
@@ -121,31 +116,21 @@ SDK переводятся в `AuthRequired` / `ProviderError` в самих м�
 ```bash
 uv sync
 uv run context --help
-uv run scripts/release.py --check   # весь гейт (его же гоняют релиз и CI) — перед каждым коммитом
-scripts/install_hooks.sh            # один раз на клон: git берёт хуки из .githooks/
+# гейт перед коммитом — шаг `rb-release check` в .gitea/workflows/ci.yml: запустить его команду
 uv run pytest --snapshot-update     # после правки справки команды; смотреть tests/snapshots/help/
 ```
 
 Гейт: `uv lock --check`, ruff (с правилами безопасности `S`), ty, pytest с порогом
-покрытия, снапшоты `--help`, форма `auth status`, фрагмент changelog, сборка и установка
-колеса во временный venv; `osv-scanner` по `uv.lock`, если он установлен.
+покрытия, снапшоты `--help`, форма `auth status`, контракты потребителей, сборка и установка
+колеса во временный venv; `osv-scanner` и `gitleaks`, если они установлены.
 
 Новый провайдер: модуль в `src/rb_context/providers/` с подклассом `SearchProvider`
 (`name`, `required`, `search`, `health_check`) и строка в `PROVIDERS` (`providers/__init__.py`).
 
 ## Релиз
 
-Версия — git-тег `vX.Y.Z`, строки `version =` в `pyproject.toml` нет. Каждое изменение —
-фрагмент changelog, `CHANGELOG.md` руками не правится:
-
-```bash
-uv run towncrier create +<slug>.<type>.md -c "Что изменилось — для человека."
-uv run scripts/release.py patch   # или minor / major (SemVer; на 0.x: patch — фикс/фича, minor — ломающее)
-git push --follow-tags
-```
-
-`release.py` работает только на чистом `main`, не отстающем от origin: гонит гейт,
-собирает `CHANGELOG.md` из `changelog.d/`, коммитит `Release vX.Y.Z` и ставит тег; пуш — за вами.
+Версия — git-тег `vX.Y.Z`, строки `version =` в `pyproject.toml` нет. Релиз делает
+`antagor publish` (гейт, `CHANGELOG.md`, тег, push); `CHANGELOG.md` руками не правится.
 
 ## Архитектура
 

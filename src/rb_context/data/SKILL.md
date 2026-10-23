@@ -13,23 +13,20 @@ description: Веб-поиск как контекст для LLM через CLI
 ## Установка (если `context --version` не работает)
 
 ```bash
-uv tool install "rb-context @ git+https://github.com/bolandeu/context.git@vX.Y.Z"
+uv tool install rb-context --index https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple
 ```
 
-Вместо `vX.Y.Z` — последний тег релиза (ставить из тега, не из ветки: стандарт §9).
+From the git tag instead:
+
+```bash
+uv tool install "rb-context @ git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/context.git@vX.Y.Z"
+```
+
+Replace `vX.Y.Z` with the latest release tag (install from a tag, never a
+branch: [the Standard](https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator/src/branch/main/skills/cli-builder/reference/standard.md), Install).
 
 Одинаково на macOS, Linux и Windows; обновление — `uv tool upgrade rb-context`.
 Из исходников не запускать, если не просили разрабатывать сам CLI.
-
-Репозиторий может быть приватным. При ошибке авторизации (`Authentication
-failed`, `could not read Username`, `Repository not found`) токен не
-спрашивать: `gh auth status`; если проходит — `gh auth setup-git` и повторить;
-если нет — попросить пользователя выполнить `gh auth login`. С настроенными
-SSH-ключами работает и так:
-
-```bash
-uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y.Z"
-```
 
 ## Правила
 
@@ -64,6 +61,10 @@ uv tool install "rb-context @ git+ssh://git@github.com/bolandeu/context.git@vX.Y
   режимы (`--exa-mode deep*`, `--tavily-mode advanced`) тратят больше — только
   когда обычный поиск не дал нужного. `auth status --check` с brave тратит
   1 запрос его лимита — не запускать по расписанию.
+- **`doctor --json`** первым, если что-то не так: версия, проект, настройки,
+  готовность ключей и внешние программы.
+- **`describe --json`** — весь CLI одним документом OpenCLI (команды, опции,
+  exit-коды, env, данные): голый документ, без конверта `{"ok": ...}`.
 
 ## Ошибки
 

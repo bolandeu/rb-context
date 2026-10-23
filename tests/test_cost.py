@@ -383,6 +383,7 @@ def test_doctor_flags_brave_check_spending_the_limit(tmp_path: Path, monkeypatch
     invoke("--project", str(tmp_path), "config", "set", "providers", "brave")
     code, payload = invoke_json("--project", str(tmp_path), "doctor")
     assert code == 0
-    [check] = [c for c in payload["checks"] if c["name"] == "credential:brave"]
+    [check] = [c for c in payload["checks"] if c["name"] == "credential"]
     assert check["ok"] is True
+    assert "brave" in (check["detail"] or "")
     assert "лимит" in (check["detail"] or "")

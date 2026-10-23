@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from typing import TypeVar
 
 import httpx
 import pytest
@@ -11,10 +10,8 @@ import pytest
 from rb_context.core.errors import AuthRequired, QuotaExceeded
 from rb_context.providers import GitHubProvider, HackerNewsProvider, HttpProvider, Quota, WikipediaProvider
 
-P = TypeVar("P", bound=HttpProvider)
 
-
-def _mock(provider: P, handler) -> P:
+def _mock[P: HttpProvider](provider: P, handler) -> P:
     provider.transport = httpx.MockTransport(handler)
     provider.retries = 0
     return provider

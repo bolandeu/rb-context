@@ -1,0 +1,1192 @@
+{
+  "opencli": "0.1",
+  "info": {
+    "title": "context",
+    "version": "<version>",
+    "summary": "Веб-контекст для LLM через поисковых провайдеров (Exa, Brave, Tavily): CLI context и библиотека rb_context"
+  },
+  "command": {
+    "name": "context",
+    "options": [
+      {
+        "name": "--json",
+        "description": "Emit machine-readable JSON output.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--quiet",
+        "description": "Suppress non-essential output.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--verbose",
+        "description": "Emit extra diagnostic output.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--non-interactive",
+        "description": "Never prompt; fail instead.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--dry-run",
+        "description": "Show what would happen without making changes.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--version",
+        "description": "Show the version and exit.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--project",
+        "arguments": [
+          {
+            "name": "TEXT",
+            "required": true,
+            "arity": {
+              "maximum": 1
+            }
+          }
+        ],
+        "description": "Path to the project root.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "str"
+          }
+        ]
+      },
+      {
+        "name": "--ai",
+        "description": "Print AI-oriented usage documentation (the bundled skill doc) and exit.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--install-completion",
+        "description": "Install completion for the current shell.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          }
+        ]
+      },
+      {
+        "name": "--show-completion",
+        "description": "Show completion for the current shell, to copy it or customize the installation.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "name": "doctor",
+        "description": "Диагностика: версия, проект, настройки, связка ключей, ключи провайдеров, внешние CLI (serp).\n\nAlways exits 0 — the report itself is the result; `healthy` says\nwhether every check passed.\n\nExample: context doctor --json",
+        "options": [
+          {
+            "name": "--json",
+            "description": "Emit machine-readable JSON output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Suppress non-essential output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "description": "Emit extra diagnostic output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "search",
+        "description": "Веб-поиск для контекста LLM: опрашивает выбранных провайдеров параллельно.\n\nБез -p — только провайдер по умолчанию (exa или `providers` проекта):\nкаждый опрошенный тратит свой лимит, поэтому всех сразу — только явно, -p all.\n\nРезультаты не смешиваются и не дедуплицируются: у каждого своя позиция\nи пометка provider (у serp ещё engine — yandex/google). Упавший\nпровайдер не мешает остальным — его ошибка в `sources[].error` (человеку —\nпредупреждение в stderr). Не ответил никто — exit 5 (PROVIDER_ERROR,\nQUOTA_EXHAUSTED — исчерпан бесплатный лимит, платный тариф не подключается)\nили 3 (AUTH_REQUIRED).\n\nsnippet — текст-контекст провайдера: exa — хайлайты страницы, tavily —\nвыжимка content, brave — описание и доп. сниппеты, serp — сниппет из\nвыдачи Яндекса/Google (нужен установленный CLI serp ≥ 0.7.2 со своими\nключами; нет или старше — DEPENDENCY_TOO_OLD в `sources[].error`),\nhackernews — очки, комментарии, текст и ссылка на обсуждение, github —\nописание и звёзды репозитория / текст issue / фрагменты кода, wikipedia —\nвводный абзац статьи.\n\nБез ключа: hackernews, wikipedia; github — токен необязателен\n(CONTEXT_GITHUB_API_KEY, связка ключей или GITHUB_TOKEN), без него лимит\n10 поисков в минуту и нет --github-mode code (AUTH_REQUIRED).\n\n--json: {\"ok\": true, \"count\": N, \"results\": [{provider, engine, query,\nposition, url, domain, title, snippet, published, score}, ...], \"sources\":\n[{provider, query, ok, count, error, billable_requests, cost,\ncost_currency, cost_source, would_cost, would_cost_unit}, ...],\n\"billable_requests_total\": N, \"cost_total\": X}. Без --json — markdown в stdout.\n\nСтоимость — на каждый вызов провайдера (sources[]). exa, tavily, brave —\nтолько бесплатные лимиты: cost 0, cost_source \"free_tier\", billable_requests\n— потраченные запросы лимита (упавший вызов — 0); would_cost — сколько вызов\nстоил бы по словам провайдера (exa — USD из costDollars, tavily — credits,\nbrave — null), в cost не входит. hackernews, wikipedia — бесплатно и без\nлимита: cost 0, billable_requests 0; github — cost 0, billable_requests 1\n(минутный лимит API; кончился — QUOTA_EXHAUSTED). serp — платный: cost, cost_source\n(\"price_table\", \"provider\", \"cache\" — 0) и billable_requests из конверта\nserp. cost — в cost_currency \"RUB\"; cost_total — сумма cost всех вызовов,\nnull, если стоимость хоть одного неизвестна (serp упал или не отдал\nстоимость — предупреждение в stderr) или не в рублях.\n\n\b\nExample: context search \"rag chunking strategies\"            # только exa\n         context search \"запрос\" -p tavily                   # только tavily\n         context search \"запрос\" -p exa,serp -n 5            # два провайдера\n         context search \"запрос\" -p all                      # все\n         context search \"купить диван\" -p serp --serp-engine google\n         context search \"купить диван\" -p serp --serp-engine yandex,google\n         context search \"sqlite wal\" -p hackernews,github,wikipedia --wikipedia-lang en\n         context search \"typer callback\" -p github --github-mode issues\n         context search \"сравнение векторных БД\" -p exa --exa-mode deep",
+        "options": [
+          {
+            "name": "--provider",
+            "aliases": [
+              "-p"
+            ],
+            "arguments": [
+              {
+                "name": "PROVIDER",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Кого опросить: один (-p exa), несколько через запятую (-p exa,serp) или все (-p all); выбранные опрашиваются параллельно, и каждый тратит свой лимит. Доступны: exa (Exa — нейропоиск, хайлайты страниц); tavily (Tavily — поиск с выжимкой контента под LLM); brave (Brave — независимый веб-индекс, описание и доп. сниппеты); serp (Яндекс/Google — выдача и сниппеты через CLI serp); hackernews (Hacker News — обсуждения и ссылки про технологии, без ключа); github (GitHub — репозитории, issues и код, токен необязателен); wikipedia (Википедия — определения и факты (ru, en), без ключа). По умолчанию — `providers` из конфига проекта, иначе exa.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--limit",
+            "aliases": [
+              "-n"
+            ],
+            "arguments": [
+              {
+                "name": "LIMIT",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Результатов с каждого провайдера (brave, wikipedia ≤ 20).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "int range"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 10
+              }
+            ]
+          },
+          {
+            "name": "--exa-mode",
+            "arguments": [
+              {
+                "name": "EXA_MODE",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Режим Exa: auto, fast, instant, deep-lite, deep, deep-reasoning. По умолчанию auto.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--tavily-mode",
+            "arguments": [
+              {
+                "name": "TAVILY_MODE",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Режим Tavily: basic, advanced, fast, ultra-fast. По умолчанию basic.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--serp-engine",
+            "arguments": [
+              {
+                "name": "SERP_ENGINE",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Поисковик для serp: yandex, google или оба через запятую. По умолчанию yandex.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--github-mode",
+            "arguments": [
+              {
+                "name": "GITHUB_MODE",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Что искать на GitHub: repositories, issues, code (code — только с токеном). По умолчанию repositories.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--wikipedia-lang",
+            "arguments": [
+              {
+                "name": "WIKIPEDIA_LANG",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Раздел Википедии: ru, en. По умолчанию ru.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Emit machine-readable JSON output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Suppress non-essential output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "description": "Emit extra diagnostic output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "name": "queries",
+            "required": true,
+            "arity": {
+              "minimum": 1
+            },
+            "description": "Один или несколько поисковых запросов.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              },
+              {
+                "name": "x-rb-multiple",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "init",
+        "description": "Initialize a project: creates .context/config.toml in the target directory.\n\nExample: context init --name demo",
+        "options": [
+          {
+            "name": "--name",
+            "arguments": [
+              {
+                "name": "NAME",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Project name (defaults to directory name).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              }
+            ]
+          },
+          {
+            "name": "--force",
+            "description": "Overwrite an already-initialized project's config.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Emit machine-readable JSON output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Suppress non-essential output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "description": "Emit extra diagnostic output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "description": "Show the current project's status.\n\nExample: context status --json",
+        "options": [
+          {
+            "name": "--json",
+            "description": "Emit machine-readable JSON output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Suppress non-essential output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "description": "Emit extra diagnostic output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "describe",
+        "description": "Print this CLI's machine-readable contract: an OpenCLI document (opencli.org).\n\nCommands, options, arguments, exit codes, plus `x-rb-*` metadata: env vars,\ntables, v1 views, data files, external programs. With --json it is the bare\ndocument on one line (no {\"ok\": ...} envelope); without, the same indented.\n\nExample: context describe --json",
+        "options": [
+          {
+            "name": "--json",
+            "description": "Emit machine-readable JSON output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Suppress non-essential output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "description": "Emit extra diagnostic output.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "description": "Ключи провайдеров (связка ключей ОС или env CONTEXT_<PROVIDER>_API_KEY).",
+        "commands": [
+          {
+            "name": "status",
+            "description": "Report every provider's credential: where it comes from and whether it works. Never prints values.\n\nWithout --check only presence is reported (status `unchecked` or `missing`).\nexa is required, tavily and brave are optional; serp keeps its own keys\n(`serp auth status`) and isn't listed (`--provider serp` is a usage error).\n--check is free for exa (an empty /search request, rejected before billing)\nand tavily (/usage, with the remaining credits as `quota`); brave has no free\ncall, so it makes one search.\nExits 0 when every required provider is ok/unchecked (an optional one may be\nmissing), 3 when any required provider has a problem or any credential is\ninvalid/expired, 2 on a usage error. The --json shape is a cross-tool contract:\n`tool`, `version`, `checked_at`, `credentials[]` with `provider`, `required`,\n`fields`, `source`, `source_ref`, `status`, `expires_at`, `quota`, `message`.\n\nExample: context auth status --check --json",
+            "options": [
+              {
+                "name": "--check",
+                "description": "Also make one cheap read-only call per provider (10 s timeout) to prove each works.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--provider",
+                "aliases": [
+                  "-p"
+                ],
+                "arguments": [
+                  {
+                    "name": "PROVIDER",
+                    "required": true,
+                    "arity": {
+                      "maximum": 1
+                    }
+                  }
+                ],
+                "description": "Report only this provider (default: all with keys: exa, tavily, brave).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "login",
+            "description": "Сохранить API-ключ провайдера в связку ключей ОС.\n\nКлюч берётся из CONTEXT_<PROVIDER>_API_KEY (например CONTEXT_EXA_API_KEY),\nесли переменная задана, иначе спрашивается. С --non-interactive и без\nпеременной — ошибка, а не вопрос. Провайдерам без ключа (hackernews,\nwikipedia) и serp (ключи хранит сам serp) — INVALID_ARGUMENTS.\n\nExample: context auth login --provider exa",
+            "options": [
+              {
+                "name": "--provider",
+                "aliases": [
+                  "-p"
+                ],
+                "required": true,
+                "arguments": [
+                  {
+                    "name": "PROVIDER",
+                    "required": true,
+                    "arity": {
+                      "maximum": 1
+                    }
+                  }
+                ],
+                "description": "Провайдер. Доступны: exa (Exa — нейропоиск, хайлайты страниц); tavily (Tavily — поиск с выжимкой контента под LLM); brave (Brave — независимый веб-индекс, описание и доп. сниппеты); serp (Яндекс/Google — выдача и сниппеты через CLI serp); hackernews (Hacker News — обсуждения и ссылки про технологии, без ключа); github (GitHub — репозитории, issues и код, токен необязателен); wikipedia (Википедия — определения и факты (ru, en), без ключа).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              },
+              {
+                "name": "--non-interactive",
+                "description": "Never prompt; fail instead.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "logout",
+            "description": "Удалить API-ключ провайдера из связки ключей ОС.\n\nExample: context auth logout --provider exa",
+            "options": [
+              {
+                "name": "--provider",
+                "aliases": [
+                  "-p"
+                ],
+                "required": true,
+                "arguments": [
+                  {
+                    "name": "PROVIDER",
+                    "required": true,
+                    "arity": {
+                      "maximum": 1
+                    }
+                  }
+                ],
+                "description": "Провайдер. Доступны: exa (Exa — нейропоиск, хайлайты страниц); tavily (Tavily — поиск с выжимкой контента под LLM); brave (Brave — независимый веб-индекс, описание и доп. сниппеты); serp (Яндекс/Google — выдача и сниппеты через CLI serp); hackernews (Hacker News — обсуждения и ссылки про технологии, без ключа); github (GitHub — репозитории, issues и код, токен необязателен); wikipedia (Википедия — определения и факты (ru, en), без ключа).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "config",
+        "description": "Manage project configuration.",
+        "commands": [
+          {
+            "name": "list",
+            "description": "List all configuration values.\n\nExample: context config list --json",
+            "options": [
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "get",
+            "description": "Get a single configuration value.\n\nExample: context config get providers",
+            "options": [
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ],
+            "arguments": [
+              {
+                "name": "key",
+                "required": true,
+                "arity": {
+                  "minimum": 1,
+                  "maximum": 1
+                },
+                "description": "Dotted config key, e.g. provider.name",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "set",
+            "description": "Set a single, non-secret configuration value.\n\nExample: context config set providers exa,serp",
+            "options": [
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ],
+            "arguments": [
+              {
+                "name": "key",
+                "required": true,
+                "arity": {
+                  "minimum": 1,
+                  "maximum": 1
+                },
+                "description": "Dotted config key, e.g. provider.name",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              },
+              {
+                "name": "value",
+                "required": true,
+                "arity": {
+                  "minimum": 1,
+                  "maximum": 1
+                },
+                "description": "New value (stored as a string).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "skill",
+        "description": "Install this CLI's agent skill for AI tools.",
+        "commands": [
+          {
+            "name": "install",
+            "description": "Copy this CLI's bundled skills into an AI tool's skill directory.\n\nThe conventions skill and every extra skill the package ships, each into its own directory.\n\nExample: context skill install --tool claude-code",
+            "options": [
+              {
+                "name": "--tool",
+                "arguments": [
+                  {
+                    "name": "TOOL",
+                    "required": true,
+                    "arity": {
+                      "maximum": 1
+                    }
+                  }
+                ],
+                "description": "Target AI tool: one of claude-code, agents.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": "claude-code"
+                  }
+                ]
+              },
+              {
+                "name": "--project",
+                "description": "Install into the current project instead of the user-level directory.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--skill",
+                "arguments": [
+                  {
+                    "name": "SKILL",
+                    "required": true,
+                    "arity": {
+                      "maximum": 1
+                    }
+                  }
+                ],
+                "description": "Install only this bundled skill (see `skill list`); by default all.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "str"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "list",
+            "description": "List the agent skills this CLI bundles: name and description.\n\nExample: context skill list",
+            "options": [
+              {
+                "name": "--json",
+                "description": "Emit machine-readable JSON output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Suppress non-essential output.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "exitCodes": [
+      {
+        "code": 0,
+        "description": "Success"
+      },
+      {
+        "code": 1,
+        "description": "General error (incl. UNEXPECTED and ABORTED)"
+      },
+      {
+        "code": 2,
+        "description": "Invalid arguments"
+      },
+      {
+        "code": 3,
+        "description": "Authentication error"
+      },
+      {
+        "code": 4,
+        "description": "Project not initialized"
+      },
+      {
+        "code": 5,
+        "description": "Provider error (external service: network, timeout, 5xx, 429, bad body)"
+      },
+      {
+        "code": 6,
+        "description": "CLI too old for this project or database"
+      }
+    ],
+    "metadata": [
+      {
+        "name": "x-rb-tool",
+        "value": {
+          "tool": "context",
+          "dist": "rb-context",
+          "package": "rb_context"
+        }
+      },
+      {
+        "name": "x-rb-template-version",
+        "value": "<template-version>"
+      },
+      {
+        "name": "x-rb-env",
+        "value": [
+          {
+            "name": "CONTEXT_BRAVE_API_KEY",
+            "purpose": "credential",
+            "provider": "brave",
+            "field": "api_key",
+            "required": false
+          },
+          {
+            "name": "CONTEXT_EXA_API_KEY",
+            "purpose": "credential",
+            "provider": "exa",
+            "field": "api_key",
+            "required": true
+          },
+          {
+            "name": "CONTEXT_GITHUB_API_KEY",
+            "purpose": "credential",
+            "provider": "github",
+            "field": "api_key",
+            "required": false,
+            "fallbacks": [
+              "GITHUB_TOKEN"
+            ]
+          },
+          {
+            "name": "CONTEXT_TAVILY_API_KEY",
+            "purpose": "credential",
+            "provider": "tavily",
+            "field": "api_key",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "x-rb-data",
+        "value": {
+          "user_data_dir": {
+            "appname": "context",
+            "files": []
+          }
+        }
+      },
+      {
+        "name": "x-rb-external",
+        "value": [
+          {
+            "name": "serp",
+            "required": false,
+            "why": "провайдер serp: выдача Яндекса/Google со сниппетами (`serp snippets --json`)",
+            "min_version": "0.7.2",
+            "check": null,
+            "detect": true,
+            "dist": "rb-serp",
+            "url": "https://github.com/bolandeu/serp"
+          }
+        ]
+      },
+      {
+        "name": "x-rb-skills",
+        "value": [
+          {
+            "name": "context",
+            "description": "Веб-поиск как контекст для LLM через CLI `context` — провайдеры Exa, Tavily, Brave и выдача Яндекса/Google (через CLI serp); каждый результат с URL, заголовком и текстом-сниппетом (хайлайты Exa, выжимка Tavily, описание Brave, сниппет выдачи). Использовать, когда задаче нужны свежие данные из интернета, источники по теме или ответ, которого нет в знаниях модели (web search, research, найти в интернете, актуальная информация). Здесь — установка, --json, коды выхода, ключи."
+          }
+        ]
+      }
+    ]
+  }
+}

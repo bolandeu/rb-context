@@ -1,38 +1,24 @@
-from __future__ import annotations
+"""The `doctor` command: checks of this CLI's own setup, one line per check."""
 
-from pathlib import Path
+from __future__ import annotations
 
 import typer
 
 from .. import output
-from ..core import deps, services
-from ..core.errors import CliTooOld, InvalidArguments
-from ..core.models import DEFAULT_PROVIDERS, ProjectConfig
-from ..core.version import DEV_VERSION, installed_version
-from ..credentials import manager as credentials
-from ..providers import provider_class
+from ..core import deps
+from ..core.version import DEV_VERSION, installed_version, optional_module
+from ..providers import all_providers
+
+_PACKAGE_NAME = __name__.split(".")[0]
 
 
-def _auth_checks(providers: list[str]) -> list[dict]:
-    backend = credentials.store_backend()
-    checks: list[dict] = [
-        {
-            "name": "credential_store",
-            "ok": backend is not None,
-            "detail": backend or "no usable OS keychain backend; credentials must come from environment variables",
-        }
-    ]
-    for provider in providers:
-        try:
-            cls = provider_class(provider)
-            ok, detail = cls.check()
-            if cls.health_check_spends_quota:
-                note = f"'auth status --check' тратит 1 запрос бесплатного лимита {provider} — не по расписанию"
-                detail = f"{detail}; {note}" if detail else note
-        except InvalidArguments as exc:
-            ok, detail = False, exc.message
-        checks.append({"name": f"credential:{provider}", "ok": ok, "detail": detail})
-    return checks
+def _quota_notes() -> str:
+    """Warn about providers whose `auth status --check` spends free quota (for the detail of the `credential` check)."""
+    return "; ".join(
+        f"'auth status --check' тратит 1 запрос бесплатного лимита {cls.name} — не по расписанию"
+        for cls in all_providers()
+        if getattr(cls, "health_check_spends_quota", False)
+    )
 
 
 @output.guard
@@ -52,27 +38,18 @@ def doctor(
     checks: list[dict] = [{"name": "python", "ok": True}]
     checks.append({"name": "cli_version", "ok": True, "detail": installed_version() or DEV_VERSION})
 
-    start = Path(ctx.obj.get("project") or Path.cwd())
-    output.vecho(ctx, f"Searching for a project root starting at: {start}")
-    root = services.find_project_root(start)
-    checks.append({"name": "project", "ok": root is not None, "detail": str(root) if root else None})
+    if project := optional_module(f"{_PACKAGE_NAME}.commands.project"):  # include_project=false drops it
+        checks.extend(project.doctor_checks(ctx))
 
-    config: ProjectConfig | None = None
-    if root is not None:
-        try:
-            config = services.load_config(root, check_compat=False)
-            checks.append({"name": "config", "ok": True})
-        except Exception as exc:
-            checks.append({"name": "config", "ok": False, "detail": str(exc)})
-    if config is not None:
-        try:
-            services.check_cli_compat(config)
-            checks.append({"name": "cli_compat", "ok": True, "detail": f"project requires >= {config.cli.min_version}"})
-        except CliTooOld as exc:
-            checks.append({"name": "cli_compat", "ok": False, "detail": exc.message})
-
-    checks.extend(_auth_checks(config.providers if config else list(DEFAULT_PROVIDERS)))
+    if credentials := optional_module(f"{_PACKAGE_NAME}.credentials.health"):  # include_auth=false drops it
+        checks.extend(credentials.doctor_checks())
+        if notes := _quota_notes():
+            for check in checks:
+                if check["name"] == "credential":
+                    check["detail"] = f"{check['detail']}; {notes}"
     checks.extend(deps.doctor_checks())  # [[tool.rb.external]] in pyproject.toml
+    if db := optional_module(f"{_PACKAGE_NAME}.core.db"):  # include_db=false drops it at generation time
+        checks.extend(db.doctor_checks())
 
     all_ok = all(check["ok"] for check in checks)
     output.emit_success(

@@ -1,6 +1,7 @@
 # Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
-_commit: v1.2.10
+_commit: v1.27.1
 _src_path: https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git
+antagor_prefix: CONTEXT
 author_name: bolandeu
 cli_name: context
 description: 'Веб-контекст для LLM через поисковых провайдеров (Exa, Brave, Tavily):
@@ -8,9 +9,14 @@ description: 'Веб-контекст для LLM через поисковых �
 dist_name: rb-context
 dist_name_legacy: ''
 include_auth: true
-include_ci: true
+include_contracts: true
+include_db: false
+include_describe: true
 include_http_provider: true
+include_project: true
+include_skill: true
+install_homeserver_users: rbtools
+install_mac: true
 package_name: rb_context
-private_deps: false
 project_name: context
 repository_url: https://homeserver.tailee01ab.ts.net:3000/bolandeu/context
