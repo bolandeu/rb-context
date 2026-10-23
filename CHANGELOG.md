@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Versions follow
 
 The changelog is written by `antagor publish`; don't edit it by hand.
 
+## v0.4.0 — 2026-10-23
+
+### Main
+
+- fix: тест doctor/Brave не зависит от ключа exa в связке ключей
+- antagor init: project context (CONTEXT)
+- antagor init: project context (CONTEXT)
+- Template v1.27.1: update from v1.2.10
+- chore: copier answers на Gitea
+
+
 ## [0.3.1] - 2026-10-06
 
 ### Added
