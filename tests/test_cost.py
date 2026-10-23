@@ -379,6 +379,7 @@ def test_brave_health_check_is_marked_as_billable() -> None:
 
 def test_doctor_flags_brave_check_spending_the_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CONTEXT_BRAVE_API_KEY", "k")
+    monkeypatch.setenv("CONTEXT_EXA_API_KEY", "k")  # exa is required: without it the credential check is not ok
     init(tmp_path)
     invoke("--project", str(tmp_path), "config", "set", "providers", "brave")
     code, payload = invoke_json("--project", str(tmp_path), "doctor")
