@@ -3,7 +3,7 @@
   "info": {
     "title": "context",
     "version": "<version>",
-    "summary": "Веб-контекст для LLM через поисковых провайдеров (Exa, Brave, Tavily): CLI context и библиотека rb_context"
+    "summary": "Web context for LLMs through search providers (Exa, Tavily, Brave)."
   },
   "command": {
     "name": "context",

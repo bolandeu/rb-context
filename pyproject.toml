@@ -2,8 +2,10 @@
 name = "rb-context"
 # Version comes from the git tag vX.Y.Z (uv-dynamic-versioning) — never add `version =`.
 dynamic = ["version"]
-description = "Веб-контекст для LLM через поисковых провайдеров (Exa, Brave, Tavily): CLI context и библиотека rb_context"
+description = "Web context for LLMs through search providers (Exa, Tavily, Brave)."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "bolandeu" }]
 requires-python = ">=3.14"
 dependencies = [
@@ -48,11 +50,6 @@ cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true 
 # same name may live there).
 # [tool.uv.sources]
 # rb-serp = { index = "gitea" }
-[[tool.uv.index]]
-name = "gitea"
-url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple"
-explicit = true
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/rb_context"]
 

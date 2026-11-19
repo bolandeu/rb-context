@@ -11,7 +11,6 @@ Python-пакет — `rb-context` (импорт `rb_context`), команда �
 ## Установка
 
 ```bash
-uv tool install rb-context --index https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple
 ```
 
 Из git-тега:
