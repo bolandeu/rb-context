@@ -116,7 +116,8 @@ SDK переводятся в `AuthRequired` / `ProviderError` в самих м�
 ```bash
 uv sync
 uv run context --help
-# гейт перед коммитом — шаг `rb-release check` в .gitea/workflows/ci.yml: запустить его команду
+# гейт перед коммитом — `gate check` на этой машине (команда — `[publish] gate_command`
+# в `.agents/antagor/antagor.toml`); workflow его не гоняет
 uv run pytest --snapshot-update     # после правки справки команды; смотреть tests/snapshots/help/
 ```
 
