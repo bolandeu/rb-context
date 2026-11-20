@@ -379,6 +379,98 @@
             ]
           },
           {
+            "name": "--source",
+            "arguments": [
+              {
+                "name": "SOURCE",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Откуда ключ: env (по умолчанию — CONTEXT_<PROVIDER>_API_KEY и связка ключей) или 9router (локальная база 9router: ключ, прокси и схема ротации из неё).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
+              }
+            ]
+          },
+          {
+            "name": "--key",
+            "arguments": [
+              {
+                "name": "KEY",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Конкретный ключ из 9router по имени подключения (вместо выбора по схеме).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
+              }
+            ]
+          },
+          {
+            "name": "--rotation",
+            "arguments": [
+              {
+                "name": "ROTATION",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Схема ротации для 9router: round-robin, least-used, single (по умолчанию — из 9router).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
+              }
+            ]
+          },
+          {
+            "name": "--proxy",
+            "arguments": [
+              {
+                "name": "PROXY",
+                "required": true,
+                "arity": {
+                  "maximum": 1
+                }
+              }
+            ],
+            "description": "Прокси для запросов этого запуска (перебивает привязку ключа в 9router).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
+              }
+            ]
+          },
+          {
             "name": "--json",
             "description": "Emit machine-readable JSON output.",
             "metadata": [

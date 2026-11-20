@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 
 from ..core import deps
@@ -45,11 +46,16 @@ def _exe() -> str:
     return deps.require_cli("serp", MIN_SERP, install_url=_REPO)
 
 
-def _run_json(args: list[str]) -> dict:
-    """Запустить `serp ... --json` и вернуть конверт; вывод не JSON — ProviderError."""
+def _run_json(args: list[str], proxy: str | None = None) -> dict:
+    """Запустить `serp ... --json` и вернуть конверт; вывод не JSON — ProviderError.
+
+    `proxy` уходит в окружение subprocess: свой флаг serp прокси не знает, а `requests` внутри него
+    читает `HTTPS_PROXY`/`HTTP_PROXY`.
+    """
+    env = {**os.environ, "HTTPS_PROXY": proxy, "HTTP_PROXY": proxy} if proxy else None
     try:
         proc = subprocess.run(  # noqa: S603 — фиксированный argv, без shell
-            [_exe(), *args, "--json"], capture_output=True, text=True, timeout=_TIMEOUT, check=False
+            [_exe(), *args, "--json"], capture_output=True, text=True, timeout=_TIMEOUT, check=False, env=env
         )
     except subprocess.TimeoutExpired as exc:
         raise ProviderError("serp", f"нет ответа за {_TIMEOUT} с") from exc
@@ -96,7 +102,7 @@ class SerpProvider(SearchProvider):
         top = min(100, max(10, -(-limit // 10) * 10))  # serp берёт выдачу страницами по 10
         engines = {part.strip() for part in (mode or self.modes[0]).split(",")}
         engine = "both" if len(engines) > 1 else engines.pop()  # оба поисковика serp просит одним вызовом
-        payload = _run_json(["snippets", query, "--engine", engine, "--top", str(top)])
+        payload = _run_json(["snippets", query, "--engine", engine, "--top", str(top)], proxy=self.proxy)
         if not payload.get("ok"):
             error = payload.get("error") or {}
             if error.get("code") == "AUTH_REQUIRED":

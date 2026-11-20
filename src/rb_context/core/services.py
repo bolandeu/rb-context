@@ -109,8 +109,42 @@ def check_modes(modes: dict[str, str | None]) -> None:
                 raise InvalidArguments(f"Режим '{part}' не поддерживается {name}. Доступны: {', '.join(cls.modes)}.")
 
 
+# Where a key comes from, set once by the command before any provider is built:
+# `--source 9router` takes the key and proxy from 9router's database, `--proxy` overrides the proxy.
+_SOURCE: dict[str, str | None] = {"source": None, "key": None, "rotation": None, "proxy": None}
+
+
+def use_source(
+    source: str | None = None,
+    *,
+    key: str | None = None,
+    rotation: str | None = None,
+    proxy: str | None = None,
+) -> None:
+    """Choose where the next providers take their credential: the store (default) or 9router's database."""
+    if source not in (None, "env", "9router"):
+        raise InvalidArguments(f"Неизвестный источник ключей '{source}'. Доступны: env, 9router.")
+    _SOURCE.update(source=source, key=key, rotation=rotation, proxy=proxy)
+
+
+def _attach_binding(provider: SearchProvider) -> None:
+    """Give the provider its key and proxy: `--proxy` first, then 9router's binding for the service."""
+    if _SOURCE["proxy"]:
+        provider.proxy = _SOURCE["proxy"]
+    if _SOURCE["source"] != "9router":
+        return
+    from ..credentials import ninerouter  # локальный импорт: пакет нужен только этому источнику
+
+    api_key, proxy = ninerouter.binding(provider.name, key=_SOURCE["key"], rotation=_SOURCE["rotation"])
+    provider.api_key_override = api_key
+    if proxy and not _SOURCE["proxy"]:
+        provider.proxy = proxy
+
+
 def _default_factory(name: str) -> SearchProvider:
-    return provider_class(name)()
+    provider = provider_class(name)()
+    _attach_binding(provider)
+    return provider
 
 
 def cost_totals(runs: list[ProviderRun]) -> tuple[float | None, int]:

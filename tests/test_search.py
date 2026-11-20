@@ -557,7 +557,8 @@ class _FakeExaClient:
 
 
 def _exa_probe(monkeypatch: pytest.MonkeyPatch, status: int, text: str = "{}") -> ExaProvider:
-    def post(url, *, json, headers, timeout):
+    def post(url, *, json, headers, timeout, proxies=None):
+        assert proxies is None  # без прокси у провайдера — прямое соединение
         assert (url, json, headers, timeout) == (
             "https://api.exa.test/search",
             {"numResults": 1},
@@ -646,3 +647,72 @@ def test_brave_health_check() -> None:
 def test_serp_has_no_context_credentials() -> None:
     assert SerpProvider.credential_fields == ()
     assert SerpProvider().health_check() == Health()
+
+
+def test_exa_search_through_proxy_carries_the_proxy_and_parses_the_same_shape(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict = {}
+
+    def post(url, **kwargs):
+        seen.update(url=url, **kwargs)
+        response = requests.Response()
+        response.status_code = 200
+        response._content = json.dumps(
+            {
+                "results": [
+                    {
+                        "url": "https://a.example/x",
+                        "title": "A",
+                        "highlights": ["h1", "h2"],
+                        "publishedDate": "2026-01-02",
+                        "score": 0.5,
+                    }
+                ],
+                "costDollars": {"total": 0.007},
+            }
+        ).encode()
+        return response
+
+    monkeypatch.setattr(exa_module.requests, "post", post)
+    provider = ExaProvider()
+    provider.proxy = "socks5://u:p@10.0.0.1:9949"
+    provider.api_key_override = "k-proxy"
+
+    hits = provider.search("q", limit=3, mode="fast")
+
+    assert seen["url"] == "https://api.exa.ai/search"
+    assert seen["proxies"] == {"http": "socks5://u:p@10.0.0.1:9949", "https": "socks5://u:p@10.0.0.1:9949"}
+    assert seen["headers"]["x-api-key"] == "k-proxy"
+    assert (seen["json"]["numResults"], seen["json"]["type"]) == (3, "fast")
+    assert (hits[0].url, hits[0].domain, hits[0].snippet, hits[0].score) == (
+        "https://a.example/x",
+        "a.example",
+        "h1 … h2",
+        0.5,
+    )
+    assert provider.last_cost.would_cost == 0.007
+
+
+def test_serp_gets_the_proxy_through_the_subprocess_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict = {}
+
+    def run(argv, **kwargs):
+        seen.update(argv=argv, **kwargs)
+        return subprocess.CompletedProcess(
+            argv, 0, stdout='{"ok": true, "count": 0, "results": [], "sources": []}', stderr=""
+        )
+
+    monkeypatch.setattr(serp_module.subprocess, "run", run)
+    monkeypatch.setattr(serp_module, "_exe", lambda: "serp")
+    serp_module._run_json(["snippets", "q"], proxy="socks5://u:p@10.0.0.1:9949")
+    assert seen["env"]["HTTPS_PROXY"] == "socks5://u:p@10.0.0.1:9949"
+    assert seen["env"]["HTTP_PROXY"] == "socks5://u:p@10.0.0.1:9949"
+
+
+def test_tavily_session_carries_the_proxy() -> None:
+    provider = TavilyProvider()
+    provider.api_key_override = "k"
+    provider.proxy = "socks5://u:p@10.0.0.1:9949"
+    assert provider._client.session.proxies == {
+        "http": "socks5://u:p@10.0.0.1:9949",
+        "https": "socks5://u:p@10.0.0.1:9949",
+    }

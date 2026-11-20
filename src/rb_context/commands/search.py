@@ -63,6 +63,23 @@ def search(
     wikipedia_lang: str | None = typer.Option(
         None, "--wikipedia-lang", help=f"Раздел Википедии: {', '.join(WikipediaProvider.modes)}. По умолчанию ru."
     ),
+    source: str | None = typer.Option(
+        None,
+        "--source",
+        help="Откуда ключ: env (по умолчанию — CONTEXT_<PROVIDER>_API_KEY и связка ключей) "
+        "или 9router (локальная база 9router: ключ, прокси и схема ротации из неё).",
+    ),
+    key: str | None = typer.Option(
+        None, "--key", help="Конкретный ключ из 9router по имени подключения (вместо выбора по схеме)."
+    ),
+    rotation: str | None = typer.Option(
+        None,
+        "--rotation",
+        help="Схема ротации для 9router: round-robin, least-used, single (по умолчанию — из 9router).",
+    ),
+    proxy: str | None = typer.Option(
+        None, "--proxy", help="Прокси для запросов этого запуска (перебивает привязку ключа в 9router)."
+    ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
     verbose: bool = output.VerboseOption,
@@ -120,6 +137,7 @@ def search(
              {cli} search "typer callback" -p github --github-mode issues
              {cli} search "сравнение векторных БД" -p exa --exa-mode deep
     """
+    services.use_source(source, key=key, rotation=rotation, proxy=proxy)
     providers = services.resolve_providers(provider, Path(ctx.obj.get("project") or Path.cwd()))
     output.vecho(ctx, f"Провайдеры: {', '.join(providers)}")
     requested = {

@@ -20,8 +20,17 @@ _STATUS_RE = re.compile(r"status code (\d{3})")
 _QUOTA_TAG_RE = re.compile(r"NO_MORE_CREDITS|[A-Z_]*BUDGET_EXCEEDED")
 
 
+BASE_URL = "https://api.exa.ai"
+SEARCH_TIMEOUT = 30.0  # реальный поиск; проверка ключа идёт за PROBE_TIMEOUT
+
+
 class ExaProvider(SearchProvider):
-    """Exa через официальный SDK `exa-py`; сниппет — хайлайты страницы."""
+    """Exa: сниппет — хайлайты страницы.
+
+    Без прокси запрос идёт через официальный SDK `exa-py`. С прокси — тот же `POST /search`, но своим
+    `requests.post(proxies=…)`: SDK прокси не принимает (`Exa(api_key, base_url, user_agent)`), а без этого
+    ключ, привязанный к прокси, уходил бы напрямую. Тело и разбор ответа — те же, что у SDK.
+    """
 
     name = "exa"
     summary = "Exa — нейропоиск, хайлайты страниц"
@@ -77,12 +86,18 @@ class ExaProvider(SearchProvider):
         """
         client = self._client
         response = requests.post(
-            f"{client.base_url}/search", json={"numResults": 1}, headers=client.headers, timeout=PROBE_TIMEOUT
+            f"{client.base_url}/search",
+            json={"numResults": 1},
+            headers=client.headers,
+            timeout=PROBE_TIMEOUT,
+            proxies=self.proxies(),
         )
         if response.status_code >= 400:
             raise ValueError(f"Request failed with status code {response.status_code}: {response.text}")
 
     def search(self, query: str, *, limit: int, mode: str | None = None) -> list[SearchHit]:
+        if self.proxy:
+            return self._search_through_proxy(query, limit=limit, mode=mode)
         with self._errors():
             response = self._client.search(query, num_results=limit, type=mode, contents={"highlights": True})
         # Только бесплатный лимит: cost 0, а costDollars из ответа — «сколько стоило бы».
@@ -104,4 +119,37 @@ class ExaProvider(SearchProvider):
                 score=result.score,
             )
             for position, result in enumerate(response.results, start=1)
+        ]
+
+    # ponytail: второй путь только ради прокси. Уйдёт, когда `search()` переедет на `requests` целиком
+    # (тесты тогда фейкуют HTTP, а не объект SDK), и `exa-py` пропадёт из зависимостей.
+    def _search_through_proxy(self, query: str, *, limit: int, mode: str | None) -> list[SearchHit]:
+        payload: dict = {"query": query, "numResults": limit, "contents": {"highlights": True}}
+        if mode:
+            payload["type"] = mode
+        headers = {"x-api-key": self.require_api_key(), "Content-Type": "application/json"}
+        with self._errors():
+            response = requests.post(
+                f"{BASE_URL}/search", json=payload, headers=headers, timeout=SEARCH_TIMEOUT, proxies=self.proxies()
+            )
+            if response.status_code >= 400:  # тот же текст, что у SDK: его разбирает `_errors`
+                raise ValueError(f"Request failed with status code {response.status_code}: {response.text}")
+            data = response.json()
+        total = (data.get("costDollars") or {}).get("total")
+        self.last_cost = CallCost(
+            billable_requests=1, would_cost=total, would_cost_unit="USD" if total is not None else None
+        )
+        return [
+            SearchHit(
+                provider=self.name,
+                query=query,
+                position=position,
+                url=result.get("url", ""),
+                domain=extract_domain(result.get("url", "")),
+                title=result.get("title") or "",
+                snippet=" … ".join(result.get("highlights") or []),
+                published=result.get("publishedDate"),
+                score=result.get("score"),
+            )
+            for position, result in enumerate(data.get("results") or [], start=1)
         ]

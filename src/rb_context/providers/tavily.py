@@ -37,6 +37,8 @@ class TavilyProvider(HttpProvider, SearchProvider):
             return self._given
         session = requests.Session()
         session.hooks["response"].append(self._remember_status)
+        if self.proxy:  # SDK своего прокси не знает — он ходит через эту сессию
+            session.proxies = self.proxies() or {}
         return TavilyClient(api_key=self.require_api_key(), session=session)
 
     def auth_headers(self) -> dict[str, str]:

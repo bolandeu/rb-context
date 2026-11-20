@@ -57,7 +57,20 @@ context search "сравнение векторных БД" -p exa --exa-mode de
 context search "news about uv" --json                     # для агентов
 context search "sqlite wal" -p hackernews,github,wikipedia --wikipedia-lang en  # бесплатные
 context search "typer callback" -p github --github-mode issues
+
+# ключи и прокси из локальной базы 9router (пакет rb-9router, не публикуется)
+context search "запрос" -p exa --source 9router            # ключ + прокси + схема из 9router
+context search "запрос" -p exa --source 9router --key netparadox   # конкретное подключение
+context search "запрос" -p exa --source 9router --rotation least-used
+context search "запрос" -p brave --proxy socks5://u:p@host:1080    # прокси для этого запуска
 ```
+
+**Источник ключа.** По умолчанию ключ берётся из окружения и keychain (`--source env`, он же
+умолчание). `--source 9router` берёт ключ из локальной базы 9router, а вместе с ним — прокси,
+привязанный к этому ключу, и схему ротации из настроек 9router (`providerStrategies`).
+`--key <имя>` выбирает конкретное подключение вместо схемы, `--rotation` перебивает схему,
+`--proxy` перебивает прокси ключа. Живых ключей нет — ошибка аргументов, молчаливого отката
+на окружение нет.
 
 **Лимиты.** Каждый опрошенный провайдер тратит свой лимит, поэтому без `-p` опрашивается
 только один — `exa`, а все сразу — только явно, `-p all`. Свой набор по умолчанию для

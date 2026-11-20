@@ -75,6 +75,23 @@ class Provider:
     # key `serp auth login` stored: shared_namespaces = ("serp",). Read-only.
     shared_namespaces: ClassVar[tuple[str, ...]] = ()
     target: str | None = None
+    # A key and a proxy chosen for this one instance instead of the store: a binding taken from 9router's
+    # database (`--source 9router`) or written by the caller of the library. Empty means "ask the store".
+    api_key_override: str | None = None
+    proxy: str | None = None
+
+    def api_key(self) -> str | None:
+        """The key for this instance: the binding's own, else the store's."""
+        return self.api_key_override or self.load_api_key()
+
+    @classmethod
+    def load_api_key(cls) -> str | None:
+        """Ключ из CONTEXT_<PROVIDER>_API_KEY или связки ключей ОС."""
+        return credentials.get_secret(cls.name)
+
+    def proxies(self) -> dict[str, str] | None:
+        """The `requests` mapping for this instance's proxy, or None when it goes direct."""
+        return {"http": self.proxy, "https": self.proxy} if self.proxy else None
 
     def credential(self) -> dict[str, str] | None:
         """This provider's credential, resolved with all of the options above (use it in auth_headers()).
@@ -172,16 +189,10 @@ class SearchProvider(Provider, ABC):
             return True, None
         return False, f"run '{cli_name()} auth login --provider {cls.name}'"
 
-    @classmethod
-    def load_api_key(cls) -> str | None:
-        """Ключ из CONTEXT_<PROVIDER>_API_KEY или связки ключей ОС."""
-        return credentials.get_secret(cls.name)
-
-    @classmethod
-    def require_api_key(cls) -> str:
-        api_key = cls.load_api_key()
+    def require_api_key(self) -> str:
+        api_key = self.api_key()
         if not api_key:
-            raise AuthRequired(cls.name)
+            raise AuthRequired(self.name)
         return api_key
 
     @abstractmethod

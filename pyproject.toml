@@ -9,7 +9,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "bolandeu" }]
 requires-python = ">=3.14"
 dependencies = [
-    "rb-credentials>=0.3,<1",
+    "rb-credentials>=0.7.1,<1",
     "typer>=0.27,<0.29",
     "rich>=13.7",
     "pydantic>=2.6",
@@ -51,6 +51,7 @@ cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true 
 # same name may live there).
 [tool.uv.sources]
 rb-credentials = { index = "gitea" }
+rb-9router = { path = "../rb-9router", editable = true }  # private, never published
 
 [[tool.uv.index]]
 name = "gitea"
@@ -97,6 +98,7 @@ dev = [
     "ruff>=0.6",
     "syrupy>=4.8",
     "ty>=0.0.80",
+    "rb-9router",  # dev only: keys and proxies from 9router's local database (`--source 9router`)
 ]
 
 # External (non-Python) dependencies — every CLI this tool runs (require_cli,
