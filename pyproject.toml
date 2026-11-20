@@ -51,7 +51,7 @@ cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true 
 # up there, and they are never taken from PyPI (an unrelated package of the
 # same name may live there).
 [tool.uv.sources]
-rb-credentials = { path = "../rb-credentials" }
+rb-credentials = { path = "../rb-credentials", editable = true }
 rb-9router = { path = "../rb-9router", editable = true }  # private, never published
 
 [tool.hatch.build.targets.sdist]
