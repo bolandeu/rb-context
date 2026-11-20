@@ -45,11 +45,7 @@ fallback-version = "0.0.0"
 # Rebuild the editable install when a commit or tag moves, so `--version` follows the tag.
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
-# Our packages come only from the Gitea registry: a version range in
-# `dependencies` ("rb-serp>=0.3") and a source line per package, never a git
-# tag. explicit = true: only the packages named in [tool.uv.sources] are looked
-# up there, and they are never taken from PyPI (an unrelated package of the
-# same name may live there).
+# Siblings resolve from disk: a version range in `dependencies` plus a `path` source, never an index.
 [tool.uv.sources]
 rb-credentials = { path = "../rb-credentials", editable = true }
 rb-9router = { path = "../rb-9router", editable = true }  # private, never published
