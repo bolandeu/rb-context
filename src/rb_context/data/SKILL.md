@@ -13,13 +13,13 @@ description: Веб-поиск как контекст для LLM через CLI
 ## Установка (если `context --version` не работает)
 
 ```bash
-uv tool install rb-context --index https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple
+uv tool install rb-context
 ```
 
 From the git tag instead:
 
 ```bash
-uv tool install "rb-context @ git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/context.git@vX.Y.Z"
+uv tool install "rb-context @ git+https://github.com/bolandeu/rb-context.git@vX.Y.Z"
 ```
 
 Replace `vX.Y.Z` with the latest release tag (install from a tag, never a

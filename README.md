@@ -16,7 +16,7 @@ Python-пакет — `rb-context` (импорт `rb_context`), команда �
 Из git-тега:
 
 ```bash
-uv tool install "rb-context @ git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/context.git@vX.Y.Z"
+uv tool install "rb-context @ git+https://github.com/bolandeu/rb-context.git@vX.Y.Z"
 ```
 
 Вместо `vX.Y.Z` — последний тег релиза. Одинаково на macOS, Linux и Windows; обновление —

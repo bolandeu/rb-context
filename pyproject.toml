@@ -27,7 +27,7 @@ dependencies = [
 context = "rb_context.cli:main"
 
 [project.urls]
-Repository = "https://homeserver.tailee01ab.ts.net:3000/bolandeu/context"
+Repository = "https://github.com/bolandeu/rb-context"
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
